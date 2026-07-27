@@ -24,7 +24,7 @@ interface SessionState {
 
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sessions: [],
       activeSessionId: null,
       isLoading: false,
@@ -33,6 +33,7 @@ export const useSessionStore = create<SessionState>()(
       setActiveSessionId: (id) => set({ activeSessionId: id }),
       
       fetchSessions: async () => {
+        if (get().isLoading) return;
         set({ isLoading: true, error: null });
         try {
           const response = await apiClient.get('/academic-sessions');
@@ -40,14 +41,20 @@ export const useSessionStore = create<SessionState>()(
           if (response.data.success && response.data.data) {
             const fetchedSessions: AcademicSession[] = response.data.data;
             
-            // Find the active session
-            const activeSession = fetchedSessions.find(s => s.status.title === 'ACTIVE');
-            const activeSessionId = activeSession ? activeSession.id : (fetchedSessions[0]?.id || null);
-            
-            set({ 
-              sessions: fetchedSessions,
-              activeSessionId,
-              isLoading: false 
+            set((state) => {
+              const currentActiveExists = fetchedSessions.some(s => s.id === state.activeSessionId);
+              let activeSessionId = state.activeSessionId;
+
+              if (!currentActiveExists || !activeSessionId) {
+                const activeSession = fetchedSessions.find(s => s.status?.title === 'ACTIVE');
+                activeSessionId = activeSession ? activeSession.id : (fetchedSessions[0]?.id || null);
+              }
+
+              return { 
+                sessions: fetchedSessions,
+                activeSessionId,
+                isLoading: false 
+              };
             });
           } else {
             set({ error: 'Failed to fetch sessions', isLoading: false });

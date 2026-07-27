@@ -8,6 +8,7 @@ import {
   Users, 
   GraduationCap, 
   BookOpen, 
+  Layers,
   Settings, 
   LogOut, 
   Bell, 
@@ -16,19 +17,33 @@ import {
   X,
   Globe,
   ChevronDown,
-  Calendar
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 
 export const AdminLayout = () => {
   const { user, logout } = useAuthStore();
   const { tenant, schoolName } = useTenantStore();
-  const { sessions, activeSessionId, setActiveSessionId } = useSessionStore();
+  const { sessions, activeSessionId, setActiveSessionId, fetchSessions } = useSessionStore();
   const location = useLocation();
   // const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
+  const [academicDropdownOpen, setAcademicDropdownOpen] = useState(
+    location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')
+  );
   
   const sessionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')) {
+      setAcademicDropdownOpen(true);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,16 +55,19 @@ export const AdminLayout = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navigation = [
+  const mainNav = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Teachers', href: '/admin/teachers', icon: Users },
     { name: 'Students', href: '/admin/students', icon: GraduationCap },
-    { name: 'Classes', href: '/admin/classes', icon: BookOpen },
+  ];
+
+  const bottomNav = [
+    { name: 'Roles & Statuses', href: '/admin/roles-permissions', icon: ShieldCheck },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex font-sans">
       
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -59,11 +77,10 @@ export const AdminLayout = () => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Fixed Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-72 bg-indigo-900 text-white transition-transform duration-300 ease-in-out
+        fixed lg:sticky top-0 h-screen z-50 w-72 bg-indigo-900 text-white transition-transform duration-300 ease-in-out shrink-0 flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        flex flex-col
       `}>
         {/* Sidebar Header */}
         <div className="h-16 flex items-center px-6 bg-indigo-950/50 border-b border-indigo-800/50">
@@ -88,7 +105,8 @@ export const AdminLayout = () => {
           <div className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-4 px-2">
             Main Menu
           </div>
-          {navigation.map((item) => {
+          
+          {mainNav.map((item) => {
             const isActive = location.pathname.startsWith(item.href);
             return (
               <NavLink
@@ -96,7 +114,92 @@ export const AdminLayout = () => {
                 to={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm
+                  ${isActive 
+                    ? 'bg-indigo-800 text-white font-medium shadow-sm shadow-indigo-900/20' 
+                    : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                  }
+                `}
+              >
+                <item.icon size={20} className={isActive ? 'text-indigo-400' : 'text-indigo-400 group-hover:text-indigo-300'} />
+                {item.name}
+              </NavLink>
+            );
+          })}
+
+          {/* Classes & Sections Collapsible Dropdown */}
+          <div className="py-0.5">
+            <button
+              onClick={() => setAcademicDropdownOpen(!academicDropdownOpen)}
+              className={`
+                w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm
+                ${(location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections'))
+                  ? 'bg-indigo-800/80 text-white font-medium'
+                  : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <BookOpen size={20} className="text-indigo-400 group-hover:text-indigo-300" />
+                <span>Classes & Sections</span>
+              </div>
+              <ChevronDown 
+                size={16} 
+                className={`text-indigo-300 transition-transform duration-300 ease-in-out ${academicDropdownOpen ? 'rotate-180' : ''}`} 
+              />
+            </button>
+
+            {/* Smooth Collapsible Submenu with CSS Grid Animation */}
+            <div className={`
+              grid transition-all duration-300 ease-in-out overflow-hidden
+              ${academicDropdownOpen 
+                ? 'grid-rows-[1fr] opacity-100 mt-1' 
+                : 'grid-rows-[0fr] opacity-0 mt-0'
+              }
+            `}>
+              <div className="min-h-0 ml-4 pl-3 border-l-2 border-indigo-700/60 space-y-1">
+                <NavLink
+                  to="/admin/classes"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <BookOpen size={15} className="text-indigo-300" />
+                  <span>Classes</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/sections"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <Layers size={15} className="text-purple-300" />
+                  <span>Sections</span>
+                </NavLink>
+              </div>
+            </div>
+          </div>
+
+          {bottomNav.map((item) => {
+            const isActive = location.pathname.startsWith(item.href);
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm
                   ${isActive 
                     ? 'bg-indigo-800 text-white font-medium shadow-sm shadow-indigo-900/20' 
                     : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
@@ -122,8 +225,8 @@ export const AdminLayout = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* Main Content (Independently Scrollable) */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-30 sticky top-0">

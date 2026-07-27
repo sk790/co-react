@@ -15,9 +15,15 @@ import { SchoolRegistration } from './pages/public/SchoolRegistration';
 import { Login } from './pages/auth/Login';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Teachers } from './pages/admin/Teachers';
+import { TeacherDetail } from './pages/admin/TeacherDetail';
 import { Students } from './pages/admin/Students';
+import { StudentDetail } from './pages/admin/StudentDetail';
 import { Classes } from './pages/admin/Classes';
+import { ClassDetail } from './pages/admin/ClassDetail';
+import { Sections } from './pages/admin/Sections';
+import { SectionDetail } from './pages/admin/SectionDetail';
 import { Settings } from './pages/admin/Settings';
+import { RolesPermissions } from './pages/admin/RolesPermissions';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -30,7 +36,7 @@ function App() {
     // Extract tenant on initial load
     const tenantName = getSubdomain();
     setTenant(tenantName);
-    
+
     // If we have a tenant subdomain, fetch its real details from the backend
     if (tenantName) {
       fetchTenantDetails(tenantName);
@@ -42,17 +48,23 @@ function App() {
       <Routes>
         {/* Main Domain Route */}
         <Route path="/" element={tenant ? <Navigate to="/login" replace /> : <LandingPage />} />
-        
+
         <Route path="/register" element={<SchoolRegistration />} />
         <Route path="/login" element={<Login />} />
-        
+
         {/* School Admin Routes */}
         <Route element={<RoleGuard allowedRoles={['SCHOOL_ADMIN']} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/teachers" element={<Teachers />} />
+            <Route path="/admin/teachers/:id" element={<TeacherDetail />} />
             <Route path="/admin/students" element={<Students />} />
+            <Route path="/admin/students/:id" element={<StudentDetail />} />
             <Route path="/admin/classes" element={<Classes />} />
+            <Route path="/admin/classes/:id" element={<ClassDetail />} />
+            <Route path="/admin/sections" element={<Sections />} />
+            <Route path="/admin/sections/:id" element={<SectionDetail />} />
+            <Route path="/admin/roles-permissions" element={<RolesPermissions />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>

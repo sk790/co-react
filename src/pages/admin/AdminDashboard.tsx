@@ -58,19 +58,19 @@ const mockSchoolData: Record<string, any> = {
       { label: 'Total Students', value: '500', change: '+12.5%', isUp: true, icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50' },
       { label: 'Total Teachers', value: '45', change: '+2.1%', isUp: true, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
       { label: 'Active Classes', value: '24', change: '0%', isUp: true, icon: BookOpen, color: 'text-purple-600', bg: 'bg-purple-50' },
-      { label: 'Monthly Revenue', value: '₹3.5L', change: '+8.4%', isUp: true, icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+      { label: 'Monthly Revenue', value: '₹1.5L', change: '+5.0%', isUp: true, icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     ],
     chartData: [
-      { name: 'Jan', revenue: 1000, expenses: 800 },
-      { name: 'Feb', revenue: 1200, expenses: 900 },
-      { name: 'Mar', revenue: 1500, expenses: 1100 },
-      { name: 'Apr', revenue: 1400, expenses: 1050 },
-      { name: 'May', revenue: 1800, expenses: 1200 },
-      { name: 'Jun', revenue: 2000, expenses: 1300 },
-      { name: 'Jul', revenue: 2200, expenses: 1500 },
+      { name: 'Jan', revenue: 1000, expenses: 600 },
+      { name: 'Feb', revenue: 1200, expenses: 700 },
+      { name: 'Mar', revenue: 1500, expenses: 800 },
+      { name: 'Apr', revenue: 1400, expenses: 750 },
+      { name: 'May', revenue: 1800, expenses: 900 },
+      { name: 'Jun', revenue: 1700, expenses: 850 },
+      { name: 'Jul', revenue: 2000, expenses: 1000 },
     ],
     recentActivity: [
-      { id: 1, user: 'Demo User', action: 'logged into', target: 'Admin Portal', time: 'Just now', avatar: 'bg-slate-100 text-slate-700' },
+      { id: 1, user: 'System Admin', action: 'initialized system settings for', target: 'Academic Year 2026', time: 'Just now', avatar: 'bg-indigo-100 text-indigo-700' },
     ]
   }
 };
