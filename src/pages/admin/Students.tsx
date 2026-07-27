@@ -7,8 +7,7 @@ import {
   RefreshCw, 
   Edit3, 
   Trash2, 
-  Mail, 
-  Phone, 
+  Mail,
   Layers, 
   CheckCircle2, 
   AlertCircle, 
@@ -16,17 +15,27 @@ import {
   Grid, 
   List, 
   Users, 
-  BookOpen, 
-  UserCheck, 
-  Hash, 
-  Calendar,
-  Sparkles,
   TrendingUp,
-  ArrowRight,
-  Check
+  ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 import { useSessionStore } from '../../store/sessionStore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../../components/ui/alert-dialog";
 
 interface UserData {
   id: string;
@@ -67,10 +76,17 @@ interface SectionOption {
   classTitle: string;
 }
 
+interface ClassOption {
+  id: string;
+  title: string;
+  sections: { id: string; title: string }[];
+}
+
 export const Students: React.FC = () => {
   // Data States
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [sectionsOptions, setSectionsOptions] = useState<SectionOption[]>([]);
+  const [classesList, setClassesList] = useState<ClassOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -84,13 +100,19 @@ export const Students: React.FC = () => {
     name: '',
     enrollmentNo: '',
     password: '',
-    sectionId: ''
+    classId: '',
+    sectionId: '',
+    parentName: '',
+    parentEmail: '',
+    parentPhone: '',
+    parentRelation: 'FATHER'
   });
 
   const [editingStudent, setEditingStudent] = useState<StudentItem | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
     enrollmentNo: '',
+    classId: '',
     sectionId: ''
   });
 
@@ -124,6 +146,7 @@ export const Students: React.FC = () => {
 
       if (classesRes.status === 'fulfilled' && classesRes.value.data.success) {
         const rawClasses = classesRes.value.data.data || [];
+        setClassesList(rawClasses);
         const secList: SectionOption[] = [];
         rawClasses.forEach((cls: any) => {
           if (cls.sections && Array.isArray(cls.sections)) {
@@ -161,13 +184,27 @@ export const Students: React.FC = () => {
       return;
     }
 
+    if (enrollForm.classId && !enrollForm.sectionId) {
+      showToast('Please select a section for the chosen class', 'error');
+      return;
+    }
+
+    if (enrollForm.parentName && !enrollForm.parentEmail) {
+      showToast('Parent Email is required if Parent Name is provided', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
         name: enrollForm.name.trim(),
         enrollmentNo: enrollForm.enrollmentNo.trim(),
         password: enrollForm.password.trim() || undefined,
-        sectionIds: enrollForm.sectionId ? [enrollForm.sectionId] : undefined
+        sectionIds: enrollForm.sectionId ? [enrollForm.sectionId] : undefined,
+        parentName: enrollForm.parentName.trim() || undefined,
+        parentEmail: enrollForm.parentEmail.trim() || undefined,
+        parentPhone: enrollForm.parentPhone.trim() || undefined,
+        parentRelation: enrollForm.parentRelation || undefined,
       };
 
       const res = await apiClient.post('/students', payload);
@@ -175,7 +212,7 @@ export const Students: React.FC = () => {
       if (res.data.success) {
         showToast('Student enrolled successfully!');
         setIsEnrollModalOpen(false);
-        setEnrollForm({ name: '', enrollmentNo: '', password: '', sectionId: '' });
+        setEnrollForm({ name: '', enrollmentNo: '', password: '', classId: '', sectionId: '', parentName: '', parentEmail: '', parentPhone: '', parentRelation: 'FATHER' });
         fetchInitialData(false);
       } else {
         showToast(res.data.message || 'Failed to enroll student', 'error');
@@ -191,6 +228,11 @@ export const Students: React.FC = () => {
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent || !editForm.name.trim()) return;
+
+    if (editForm.classId && !editForm.sectionId) {
+      showToast('Please select a section for the chosen class', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -216,8 +258,6 @@ export const Students: React.FC = () => {
 
   // Handle Delete Student
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
-    if (!window.confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
-
     setDeletingId(studentId);
     try {
       const res = await apiClient.delete(`/students/${studentId}`);
@@ -563,9 +603,11 @@ export const Students: React.FC = () => {
                           onClick={() => {
                             setEditingStudent(s);
                             const currentSecId = s.enrollments && s.enrollments.length > 0 ? s.enrollments[0].section?.id || '' : '';
+                            const currentClassId = classesList.find(c => c.sections.some(sec => sec.id === currentSecId))?.id || '';
                             setEditForm({
                               name: s.user.name,
                               enrollmentNo: s.enrollmentNo,
+                              classId: currentClassId,
                               sectionId: currentSecId
                             });
                           }}
@@ -574,14 +616,38 @@ export const Students: React.FC = () => {
                         >
                           <Edit3 size={15} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteStudent(s.id, s.user.name)}
-                          disabled={deletingId === s.id}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Remove Student"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              disabled={deletingId === s.id}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Remove Student"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remove Student?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you absolutely sure you want to remove the student "{s.user.name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDeleteStudent(s.id, s.user.name);
+                                }}
+                                disabled={deletingId === s.id}
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                              >
+                                {deletingId === s.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </td>
                   </tr>
@@ -619,9 +685,11 @@ export const Students: React.FC = () => {
                       onClick={() => {
                         setEditingStudent(s);
                         const currentSecId = s.enrollments && s.enrollments.length > 0 ? s.enrollments[0].section?.id || '' : '';
+                        const currentClassId = classesList.find(c => c.sections.some(sec => sec.id === currentSecId))?.id || '';
                         setEditForm({
                           name: s.user.name,
                           enrollmentNo: s.enrollmentNo,
+                          classId: currentClassId,
                           sectionId: currentSecId
                         });
                       }}
@@ -629,13 +697,37 @@ export const Students: React.FC = () => {
                     >
                       <Edit3 size={15} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteStudent(s.id, s.user.name)}
-                      disabled={deletingId === s.id}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          disabled={deletingId === s.id}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Student?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you absolutely sure you want to remove the student "{s.user.name}"? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteStudent(s.id, s.user.name);
+                            }}
+                            disabled={deletingId === s.id}
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                          >
+                            {deletingId === s.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
@@ -721,22 +813,72 @@ export const Students: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Assign Class Section (Optional)
-                </label>
-                <select
-                  value={enrollForm.sectionId}
-                  onChange={(e) => setEnrollForm({ ...enrollForm, sectionId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Section --</option>
-                  {sectionsOptions.map(sec => (
-                    <option key={sec.id} value={sec.id}>
-                      {sec.classTitle} - {sec.title}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Assign Class (Optional)
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300">
+                        <span>
+                          {enrollForm.classId 
+                            ? classesList.find(c => c.id === enrollForm.classId)?.title
+                            : "-- Select Class --"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                      <DropdownMenuItem onClick={() => setEnrollForm({ ...enrollForm, classId: '', sectionId: '' })} className="cursor-pointer text-slate-500 italic">
+                        -- Select Class --
+                      </DropdownMenuItem>
+                      {classesList.map(cls => (
+                        <DropdownMenuItem 
+                          key={cls.id} 
+                          onClick={() => setEnrollForm({ ...enrollForm, classId: cls.id, sectionId: '' })}
+                          className="cursor-pointer"
+                        >
+                          {cls.title}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Assign Section {enrollForm.classId && '*'}
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={!enrollForm.classId}>
+                      <button type="button" disabled={!enrollForm.classId} className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span>
+                          {enrollForm.sectionId 
+                            ? classesList.find(c => c.id === enrollForm.classId)?.sections?.find(s => s.id === enrollForm.sectionId)?.title
+                            : "-- Select Section --"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    {enrollForm.classId && (
+                      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                        <DropdownMenuItem onClick={() => setEnrollForm({ ...enrollForm, sectionId: '' })} className="cursor-pointer text-slate-500 italic">
+                          -- Select Section --
+                        </DropdownMenuItem>
+                        {classesList.find(c => c.id === enrollForm.classId)?.sections?.map(sec => (
+                          <DropdownMenuItem 
+                            key={sec.id} 
+                            onClick={() => setEnrollForm({ ...enrollForm, sectionId: sec.id })}
+                            className="cursor-pointer"
+                          >
+                            {sec.title}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    )}
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div>
@@ -750,6 +892,82 @@ export const Students: React.FC = () => {
                   onChange={(e) => setEnrollForm({ ...enrollForm, password: e.target.value })}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
                 />
+              </div>
+
+              {/* PARENT DETAILS */}
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                  <Users size={16} className="text-indigo-600" />
+                  Parent / Guardian Details
+                </h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Parent Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Anil Sharma"
+                        value={enrollForm.parentName}
+                        onChange={(e) => setEnrollForm({ ...enrollForm, parentName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Relation
+                      </label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300">
+                            <span>{enrollForm.parentRelation}</span>
+                            <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                          {['FATHER', 'MOTHER', 'GUARDIAN'].map(rel => (
+                            <DropdownMenuItem 
+                              key={rel} 
+                              onClick={() => setEnrollForm({ ...enrollForm, parentRelation: rel })}
+                              className="cursor-pointer"
+                            >
+                              {rel}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Parent Email {enrollForm.parentName && '*'}
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="e.g. anil@example.com"
+                        value={enrollForm.parentEmail}
+                        onChange={(e) => setEnrollForm({ ...enrollForm, parentEmail: e.target.value })}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
+                        required={!!enrollForm.parentName}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Parent Phone
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 9876543210"
+                        value={enrollForm.parentPhone}
+                        onChange={(e) => setEnrollForm({ ...enrollForm, parentPhone: e.target.value })}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -816,22 +1034,72 @@ export const Students: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Assign Class Section
-                </label>
-                <select
-                  value={editForm.sectionId}
-                  onChange={(e) => setEditForm({ ...editForm, sectionId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- No Section (Unassigned) --</option>
-                  {sectionsOptions.map(sec => (
-                    <option key={sec.id} value={sec.id}>
-                      {sec.classTitle} - {sec.title}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Assign Class
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300">
+                        <span>
+                          {editForm.classId 
+                            ? classesList.find(c => c.id === editForm.classId)?.title
+                            : "-- Select Class --"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                      <DropdownMenuItem onClick={() => setEditForm({ ...editForm, classId: '', sectionId: '' })} className="cursor-pointer text-slate-500 italic">
+                        -- No Class (Unassigned) --
+                      </DropdownMenuItem>
+                      {classesList.map(cls => (
+                        <DropdownMenuItem 
+                          key={cls.id} 
+                          onClick={() => setEditForm({ ...editForm, classId: cls.id, sectionId: '' })}
+                          className="cursor-pointer"
+                        >
+                          {cls.title}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Assign Section {editForm.classId && '*'}
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={!editForm.classId}>
+                      <button type="button" disabled={!editForm.classId} className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span>
+                          {editForm.sectionId 
+                            ? classesList.find(c => c.id === editForm.classId)?.sections?.find(s => s.id === editForm.sectionId)?.title
+                            : "-- Select Section --"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    {editForm.classId && (
+                      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                        <DropdownMenuItem onClick={() => setEditForm({ ...editForm, sectionId: '' })} className="cursor-pointer text-slate-500 italic">
+                          -- Select Section --
+                        </DropdownMenuItem>
+                        {classesList.find(c => c.id === editForm.classId)?.sections?.map(sec => (
+                          <DropdownMenuItem 
+                            key={sec.id} 
+                            onClick={() => setEditForm({ ...editForm, sectionId: sec.id })}
+                            className="cursor-pointer"
+                          >
+                            {sec.title}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    )}
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

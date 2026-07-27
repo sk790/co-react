@@ -1,5 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store/tenantStore';
 import { useSessionStore } from '../store/sessionStore';
@@ -18,7 +24,8 @@ import {
   Globe,
   ChevronDown,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  UserCircle
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -28,12 +35,9 @@ export const AdminLayout = () => {
   const location = useLocation();
   // const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionOpen, setSessionOpen] = useState(false);
   const [academicDropdownOpen, setAcademicDropdownOpen] = useState(
     location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')
   );
-  
-  const sessionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchSessions();
@@ -45,20 +49,11 @@ export const AdminLayout = () => {
     }
   }, [location.pathname]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sessionRef.current && !sessionRef.current.contains(event.target as Node)) {
-        setSessionOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const mainNav = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Teachers', href: '/admin/teachers', icon: Users },
     { name: 'Students', href: '/admin/students', icon: GraduationCap },
+    { name: 'Parents', href: '/admin/parents', icon: UserCircle },
   ];
 
   const bottomNav = [
@@ -252,49 +247,40 @@ export const AdminLayout = () => {
           <div className="flex items-center gap-2 sm:gap-4">
             
             {/* Academic Session Dropdown */}
-            <div className="relative hidden sm:block" ref={sessionRef}>
-              <button 
-                onClick={() => setSessionOpen(!sessionOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-lg transition-colors text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
-              >
-                <Calendar size={16} className="text-indigo-600" />
-                {sessions.find(s => s.id === activeSessionId)?.title || 'No Session'}
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${sessionOpen ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {sessionOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg shadow-slate-200/50 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="px-3 py-2 text-xs font-bold tracking-wider text-slate-400 uppercase border-b border-slate-100 mb-1">
-                    Select Session
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {sessions.map((session) => (
-                      <button
-                        key={session.id}
-                        onClick={() => {
-                          setActiveSessionId(session.id);
-                          setSessionOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-50 ${
-                          activeSessionId === session.id 
-                            ? 'text-indigo-600 bg-indigo-50/50' 
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>{session.title}</span>
-                          {session.status.title === 'ACTIVE' && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                              ACTIVE
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 rounded-lg transition-colors text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 data-[state=open]:border-indigo-300 data-[state=open]:bg-indigo-50"
+                >
+                  <Calendar size={16} className="text-indigo-600" />
+                  {sessions.find(s => s.id === activeSessionId)?.title || 'No Session'}
+                  <ChevronDown size={14} className="text-slate-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1">
+                <div className="px-2 py-1.5 text-xs font-bold tracking-wider text-slate-400 uppercase mb-1">
+                  Select Session
                 </div>
-              )}
-            </div>
+                {sessions.map((session) => (
+                  <DropdownMenuItem
+                    key={session.id}
+                    onClick={() => setActiveSessionId(session.id)}
+                    className={`flex items-center justify-between cursor-pointer rounded-md px-2 py-2 text-sm font-medium transition-colors focus:bg-slate-50 ${
+                      activeSessionId === session.id 
+                        ? 'text-indigo-600 bg-indigo-50/50' 
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    <span>{session.title}</span>
+                    {session.status.title === 'ACTIVE' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                        ACTIVE
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
               <Bell size={20} />
@@ -304,15 +290,25 @@ export const AdminLayout = () => {
             <div className="h-8 w-px bg-slate-200 mx-1 hidden sm:block"></div>
             
             {/* User Profile */}
-            <div className="flex items-center gap-3 cursor-pointer p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-inner">
-                {user?.name.charAt(0) || 'A'}
-              </div>
-              <div className="hidden md:block text-sm">
-                <p className="font-semibold text-slate-700 leading-none">{user?.name}</p>
-                <p className="text-slate-500 text-xs mt-1 leading-none capitalize">{user?.role?.replace('_', ' ').toLowerCase()}</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="flex items-center gap-3 cursor-pointer p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200 data-[state=open]:bg-slate-50 data-[state=open]:border-slate-200">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-inner">
+                    {user?.name.charAt(0) || 'A'}
+                  </div>
+                  <div className="hidden md:block text-sm text-left">
+                    <p className="font-semibold text-slate-700 leading-none">{user?.name}</p>
+                    <p className="text-slate-500 text-xs mt-1 leading-none capitalize">{user?.role?.replace('_', ' ').toLowerCase()}</p>
+                  </div>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1">
+                <DropdownMenuItem onClick={logout} className="text-rose-600 cursor-pointer flex items-center gap-2 px-2 py-2">
+                  <LogOut size={16} />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

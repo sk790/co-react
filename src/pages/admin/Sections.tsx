@@ -21,6 +21,22 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 import { useSessionStore } from '../../store/sessionStore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../../components/ui/alert-dialog";
 
 interface TeacherInfo {
   id: string;
@@ -209,8 +225,6 @@ export const Sections: React.FC = () => {
 
   // Handle Delete Section
   const handleDeleteSection = async (sectionId: string, sectionTitle: string) => {
-    if (!window.confirm(`Are you sure you want to delete section "${sectionTitle}"?`)) return;
-
     setDeletingId(sectionId);
     try {
       const res = await apiClient.delete(`/sections/${sectionId}`);
@@ -280,7 +294,8 @@ export const Sections: React.FC = () => {
               title: '',
               classId: classesList[0]?.id || '',
               teacherId: '',
-              capacity: 40
+              capacity: 40,
+              roomNumber:""
             });
             setIsCreateModalOpen(true);
           }}
@@ -508,14 +523,38 @@ export const Sections: React.FC = () => {
                           >
                             <Edit3 size={15} />
                           </button>
-                          <button
-                            onClick={() => handleDeleteSection(sec.id, sec.title)}
-                            disabled={deletingId === sec.id}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Delete Section"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                disabled={deletingId === sec.id}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="Delete Section"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Section?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you absolutely sure you want to delete the section "{sec.title}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleDeleteSection(sec.id, sec.title);
+                                  }}
+                                  disabled={deletingId === sec.id}
+                                  className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                                >
+                                  {deletingId === sec.id ? 'Deleting...' : 'Delete'}
+                                </button>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </td>
                     </tr>
@@ -574,13 +613,37 @@ export const Sections: React.FC = () => {
                       >
                         <Edit3 size={15} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteSection(sec.id, sec.title)}
-                        disabled={deletingId === sec.id}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            disabled={deletingId === sec.id}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Section?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you absolutely sure you want to delete the section "{sec.title}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteSection(sec.id, sec.title);
+                              }}
+                              disabled={deletingId === sec.id}
+                              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                            >
+                              {deletingId === sec.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
 
@@ -659,17 +722,25 @@ export const Sections: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Parent Class *
                 </label>
-                <select
-                  value={createForm.classId}
-                  onChange={(e) => setCreateForm({ ...createForm, classId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                  required
-                >
-                  <option value="">-- Select Class --</option>
-                  {classesList.map(cls => (
-                    <option key={cls.id} value={cls.id}>{cls.title}</option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{createForm.classId ? classesList.find(c => c.id === createForm.classId)?.title : "-- Select Class --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    {classesList.map(cls => (
+                      <DropdownMenuItem 
+                        key={cls.id} 
+                        onClick={() => setCreateForm({ ...createForm, classId: cls.id })}
+                        className="cursor-pointer"
+                      >
+                        {cls.title}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
@@ -690,16 +761,28 @@ export const Sections: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Assign Instructor (Optional)
                 </label>
-                <select
-                  value={createForm.teacherId}
-                  onChange={(e) => setCreateForm({ ...createForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- No Instructor (Unassigned) --</option>
-                  {teachersList.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{createForm.teacherId ? teachersList.find(t => t.id === createForm.teacherId)?.name : "-- No Instructor (Unassigned) --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    <DropdownMenuItem onClick={() => setCreateForm({ ...createForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- No Instructor (Unassigned) --
+                    </DropdownMenuItem>
+                    {teachersList.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setCreateForm({ ...createForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -786,16 +869,28 @@ export const Sections: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Assign Instructor
                 </label>
-                <select
-                  value={editForm.teacherId}
-                  onChange={(e) => setEditForm({ ...editForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- No Instructor (Unassigned) --</option>
-                  {teachersList.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{editForm.teacherId ? teachersList.find(t => t.id === editForm.teacherId)?.name : "-- No Instructor (Unassigned) --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    <DropdownMenuItem onClick={() => setEditForm({ ...editForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- No Instructor (Unassigned) --
+                    </DropdownMenuItem>
+                    {teachersList.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setEditForm({ ...editForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

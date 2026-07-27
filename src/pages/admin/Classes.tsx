@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Edit3,
   Trash2,
-  Users,
   CheckCircle2,
   AlertCircle,
   X,
@@ -15,11 +14,25 @@ import {
   Grid,
   List,
   UserCheck,
-  Sparkles,
   ChevronRight,
-  GraduationCap
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../../components/ui/alert-dialog";
 
 interface SectionTeacher {
   user?: {
@@ -224,8 +237,6 @@ export const Classes: React.FC = () => {
 
   // Handle Deleting Class
   const handleDeleteClass = async (classId: string) => {
-    if (!window.confirm('Are you sure you want to delete this class and all associated sections?')) return;
-
     setDeletingId(classId);
     try {
       const res = await apiClient.delete(`/classes/${classId}`);
@@ -262,7 +273,7 @@ export const Classes: React.FC = () => {
 
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${toast.type === 'success'
+        <div className={`fixed top-4 right-4 z-999999 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${toast.type === 'success'
             ? 'bg-emerald-600 text-white shadow-emerald-600/20'
             : 'bg-rose-600 text-white shadow-rose-600/20'
           }`}>
@@ -275,7 +286,7 @@ export const Classes: React.FC = () => {
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-900 text-white p-6 rounded-2xl shadow-xl border border-purple-900/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-linear-to-r from-slate-900 via-purple-950 to-indigo-900 text-white p-6 rounded-2xl shadow-xl border border-purple-900/30">
         <div>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-purple-600/30 rounded-xl border border-purple-500/30 text-purple-300">
@@ -459,14 +470,38 @@ export const Classes: React.FC = () => {
                     >
                       <Edit3 size={15} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteClass(cls.id)}
-                      disabled={deletingId === cls.id}
-                      title="Delete Class"
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          disabled={deletingId === cls.id}
+                          title="Delete Class"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Class?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you absolutely sure you want to delete the class "{cls.title}" and all its associated sections? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteClass(cls.id);
+                            }}
+                            disabled={deletingId === cls.id}
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                          >
+                            {deletingId === cls.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
@@ -610,13 +645,37 @@ export const Classes: React.FC = () => {
                         >
                           <Edit3 size={15} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteClass(cls.id)}
-                          disabled={deletingId === cls.id}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              disabled={deletingId === cls.id}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Class?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you absolutely sure you want to delete the class "{cls.title}" and all its associated sections? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDeleteClass(cls.id);
+                                }}
+                                disabled={deletingId === cls.id}
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                              >
+                                {deletingId === cls.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </td>
                   </tr>
@@ -676,18 +735,28 @@ export const Classes: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Class Teacher (Optional)
                 </label>
-                <select
-                  value={createForm.teacherId}
-                  onChange={(e) => setCreateForm({ ...createForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Class Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{createForm.teacherId ? teachers.find(t => t.id === createForm.teacherId)?.user?.name || 'Unnamed Teacher' : "-- Select Class Instructor --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                    <DropdownMenuItem onClick={() => setCreateForm({ ...createForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Class Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setCreateForm({ ...createForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
@@ -759,18 +828,28 @@ export const Classes: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Section Instructor (Optional)
                 </label>
-                <select
-                  value={sectionForm.teacherId}
-                  onChange={(e) => setSectionForm({ ...sectionForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{sectionForm.teacherId ? teachers.find(t => t.id === sectionForm.teacherId)?.user?.name || 'Unnamed Teacher' : "-- Select Instructor --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                    <DropdownMenuItem onClick={() => setSectionForm({ ...sectionForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setSectionForm({ ...sectionForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

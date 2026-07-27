@@ -302,7 +302,7 @@ export const RolesPermissions: React.FC = () => {
       
       {/* Toast Notification */}
       {message && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
           message.type === 'success' 
             ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
             : 'bg-rose-600 text-white shadow-rose-600/20'

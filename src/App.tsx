@@ -24,6 +24,7 @@ import { Sections } from './pages/admin/Sections';
 import { SectionDetail } from './pages/admin/SectionDetail';
 import { Settings } from './pages/admin/Settings';
 import { RolesPermissions } from './pages/admin/RolesPermissions';
+import { Parents } from './pages/admin/Parents';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -60,6 +61,7 @@ function App() {
             <Route path="/admin/teachers/:id" element={<TeacherDetail />} />
             <Route path="/admin/students" element={<Students />} />
             <Route path="/admin/students/:id" element={<StudentDetail />} />
+            <Route path="/admin/parents" element={<Parents />} />
             <Route path="/admin/classes" element={<Classes />} />
             <Route path="/admin/classes/:id" element={<ClassDetail />} />
             <Route path="/admin/sections" element={<Sections />} />

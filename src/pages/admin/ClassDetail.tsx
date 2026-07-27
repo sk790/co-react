@@ -24,6 +24,12 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 import { useSessionStore } from '../../store/sessionStore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 
 interface TeacherUser {
   name?: string;
@@ -345,7 +351,7 @@ export const ClassDetail: React.FC = () => {
       
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
           toast.type === 'success' 
             ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
             : 'bg-rose-600 text-white shadow-rose-600/20'
@@ -843,18 +849,32 @@ export const ClassDetail: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Section Instructor (Optional)
                 </label>
-                <select
-                  value={sectionForm.teacherId}
-                  onChange={(e) => setSectionForm({ ...sectionForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>
+                        {sectionForm.teacherId 
+                          ? teachers.find(t => t.id === sectionForm.teacherId)?.user?.name || 'Unnamed Teacher'
+                          : "-- Select Instructor --"}
+                      </span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    <DropdownMenuItem onClick={() => setSectionForm({ ...sectionForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setSectionForm({ ...sectionForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -942,18 +962,32 @@ export const ClassDetail: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Section Instructor
                 </label>
-                <select
-                  value={editSectionForm.teacherId}
-                  onChange={(e) => setEditSectionForm({ ...editSectionForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>
+                        {editSectionForm.teacherId 
+                          ? teachers.find(t => t.id === editSectionForm.teacherId)?.user?.name || 'Unnamed Teacher'
+                          : "-- Select Instructor --"}
+                      </span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    <DropdownMenuItem onClick={() => setEditSectionForm({ ...editSectionForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setEditSectionForm({ ...editSectionForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

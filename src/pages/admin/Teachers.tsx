@@ -28,6 +28,17 @@ import {
   Clock
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../../components/ui/alert-dialog";
 
 interface UserData {
   id?: string;
@@ -244,8 +255,6 @@ export const Teachers: React.FC = () => {
 
   // Handle Delete Teacher
   const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
-    if (!window.confirm(`Are you sure you want to delete teacher "${teacherName}"?`)) return;
-
     setDeletingId(teacherId);
     try {
       const res = await apiClient.delete(`/teachers/${teacherId}`);
@@ -477,14 +486,38 @@ export const Teachers: React.FC = () => {
                     >
                       <Edit3 size={15} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteTeacher(t.id, t.user.name)}
-                      disabled={deletingId === t.id}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                      title="Delete Teacher"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          disabled={deletingId === t.id}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Delete Teacher"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Teacher?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you absolutely sure you want to delete the teacher "{t.user.name}"? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteTeacher(t.id, t.user.name);
+                            }}
+                            disabled={deletingId === t.id}
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                          >
+                            {deletingId === t.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
@@ -637,13 +670,38 @@ export const Teachers: React.FC = () => {
                         >
                           <Edit3 size={15} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteTeacher(t.id, t.user.name)}
-                          disabled={deletingId === t.id}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              disabled={deletingId === t.id}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Delete Teacher"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Teacher?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you absolutely sure you want to delete the teacher "{t.user.name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDeleteTeacher(t.id, t.user.name);
+                                }}
+                                disabled={deletingId === t.id}
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white bg-rose-600 text-white hover:bg-rose-700 h-10 py-2 px-4"
+                              >
+                                {deletingId === t.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </td>
                   </tr>

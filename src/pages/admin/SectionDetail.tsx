@@ -23,9 +23,16 @@ import {
   Clock,
   Plus,
   Printer,
-  MapPin
+  MapPin,
+  ChevronDown
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { useSessionStore } from '../../store/sessionStore';
 
 interface UserInfo {
@@ -993,18 +1000,28 @@ export const SectionDetail: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Section Instructor
                 </label>
-                <select
-                  value={editForm.teacherId}
-                  onChange={(e) => setEditForm({ ...editForm, teacherId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white"
-                >
-                  <option value="">-- Select Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 bg-white data-[state=open]:border-indigo-300">
+                      <span>{editForm.teacherId ? teachers.find(t => t.id === editForm.teacherId)?.user?.name || 'Unnamed Teacher' : "-- Select Instructor --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                    <DropdownMenuItem onClick={() => setEditForm({ ...editForm, teacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setEditForm({ ...editForm, teacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1077,16 +1094,25 @@ export const SectionDetail: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Day of Week *
                 </label>
-                <select
-                  value={periodForm.dayOfWeek}
-                  onChange={(e) => setPeriodForm({ ...periodForm, dayOfWeek: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                  required
-                >
-                  {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{periodForm.dayOfWeek || "-- Select Day --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(d => (
+                      <DropdownMenuItem 
+                        key={d} 
+                        onClick={() => setPeriodForm({ ...periodForm, dayOfWeek: d })}
+                        className="cursor-pointer"
+                      >
+                        {d}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>
@@ -1107,19 +1133,28 @@ export const SectionDetail: React.FC = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Assigned Instructor *
                 </label>
-                <select
-                  value={periodForm.instructorId}
-                  onChange={(e) => setPeriodForm({ ...periodForm, instructorId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
-                  required
-                >
-                  <option value="">-- Select Instructor --</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.user?.name || 'Unnamed Teacher'}
-                    </option>
-                  ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>{periodForm.instructorId ? teachers.find(t => t.id === periodForm.instructorId)?.user?.name || 'Unnamed Teacher' : "-- Select Instructor --"}</span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1 max-h-64 overflow-y-auto">
+                    <DropdownMenuItem onClick={() => setPeriodForm({ ...periodForm, instructorId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- Select Instructor --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setPeriodForm({ ...periodForm, instructorId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
