@@ -30,7 +30,13 @@ export const useSessionStore = create<SessionState>()(
       isLoading: false,
       error: null,
       
-      setActiveSessionId: (id) => set({ activeSessionId: id }),
+      setActiveSessionId: (id) => {
+        const currentActiveId = get().activeSessionId;
+        if (currentActiveId !== id) {
+          set({ activeSessionId: id });
+          window.location.reload();
+        }
+      },
       
       fetchSessions: async () => {
         if (get().isLoading) return;

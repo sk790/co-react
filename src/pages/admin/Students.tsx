@@ -20,7 +20,10 @@ import {
   UserCheck, 
   Hash, 
   Calendar,
-  Sparkles
+  Sparkles,
+  TrendingUp,
+  ArrowRight,
+  Check
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 import { useSessionStore } from '../../store/sessionStore';
@@ -144,7 +147,7 @@ export const Students: React.FC = () => {
     }
   };
 
-  const { activeSessionId } = useSessionStore();
+  const { sessions, activeSessionId } = useSessionStore();
 
   useEffect(() => {
     fetchInitialData(true);
@@ -231,6 +234,88 @@ export const Students: React.FC = () => {
     }
   };
 
+  // Promotion States
+  const [isBulkPromoteModalOpen, setIsBulkPromoteModalOpen] = useState(false);
+  const [singlePromoteStudent, setSinglePromoteStudent] = useState<StudentItem | null>(null);
+  const [sourceSectionId, setSourceSectionId] = useState<string>('');
+  const [targetSectionId, setTargetSectionId] = useState<string>('');
+  const [targetSessionId, setTargetSessionId] = useState<string>('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  // Handle Student Promotion (Single or Bulk)
+  const handlePromoteStudents = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const selectedSession = targetSessionId || activeSessionId;
+    if (!selectedSession) {
+      showToast('Please select a target Academic Session', 'error');
+      return;
+    }
+
+    if (singlePromoteStudent) {
+      if (!targetSectionId) {
+        showToast('Please select a target class/section', 'error');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const res = await apiClient.post('/students/promote', {
+          targetSessionId: selectedSession,
+          promotions: [
+            { studentId: singlePromoteStudent.id, sectionId: targetSectionId }
+          ]
+        });
+        if (res.data.success) {
+          showToast(`Student "${singlePromoteStudent.user.name}" promoted successfully!`);
+          setSinglePromoteStudent(null);
+          setTargetSectionId('');
+          fetchInitialData(false);
+        } else {
+          showToast(res.data.message || 'Failed to promote student', 'error');
+        }
+      } catch (err: any) {
+        showToast(err.response?.data?.message || 'Error promoting student', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Bulk promotion
+    if (selectedStudentIds.length === 0 || !targetSectionId) {
+      showToast('Please select at least one student and a target section', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const promotions = selectedStudentIds.map(stId => ({
+        studentId: stId,
+        sectionId: targetSectionId
+      }));
+
+      const res = await apiClient.post('/students/promote', {
+        targetSessionId: selectedSession,
+        promotions
+      });
+
+      if (res.data.success) {
+        showToast(`${selectedStudentIds.length} Students promoted successfully!`);
+        setIsBulkPromoteModalOpen(false);
+        setSelectedStudentIds([]);
+        setSourceSectionId('');
+        setTargetSectionId('');
+        fetchInitialData(false);
+      } else {
+        showToast(res.data.message || 'Failed to promote students', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error promoting students', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Filter students by search term
   const filteredStudents = students.filter(s => 
     s.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -248,21 +333,6 @@ export const Students: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
-            : 'bg-rose-600 text-white shadow-rose-600/20'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.text}</span>
-          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
-            <X size={16} />
-          </button>
-        </div>
-      )}
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-6 rounded-2xl shadow-xl border border-indigo-900/30">
@@ -280,16 +350,31 @@ export const Students: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setEnrollForm({ name: '', enrollmentNo: '', password: '', sectionId: '' });
-            setIsEnrollModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-indigo-600/30 self-start sm:self-auto active:scale-95"
-        >
-          <Plus size={18} />
-          Enroll New Student
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => {
+              setSelectedStudentIds([]);
+              setSourceSectionId('');
+              setTargetSectionId('');
+              setIsBulkPromoteModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-emerald-600/30 active:scale-95"
+          >
+            <TrendingUp size={18} />
+            Promote Students
+          </button>
+
+          <button
+            onClick={() => {
+              setEnrollForm({ name: '', enrollmentNo: '', password: '', sectionId: '' });
+              setIsEnrollModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-600/30 active:scale-95"
+          >
+            <Plus size={18} />
+            Enroll New Student
+          </button>
+        </div>
       </div>
 
       {/* Stats Overview */}
@@ -464,6 +549,16 @@ export const Students: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setSinglePromoteStudent(s);
+                            setTargetSectionId('');
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Promote Student to Next Class"
+                        >
+                          <TrendingUp size={15} />
+                        </button>
                         <button
                           onClick={() => {
                             setEditingStudent(s);
@@ -757,6 +852,279 @@ export const Students: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* MODAL 3: PROMOTE SINGLE STUDENT */}
+      {singlePromoteStudent && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
+                <TrendingUp className="text-emerald-600" size={20} />
+                <h3>Promote Student</h3>
+              </div>
+              <button 
+                onClick={() => setSinglePromoteStudent(null)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePromoteStudents} className="space-y-4">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+                <div className="font-bold text-slate-900 text-sm">{singlePromoteStudent.user.name}</div>
+                <div className="text-slate-500">ID: <span className="font-mono text-slate-700 font-bold">{singlePromoteStudent.enrollmentNo}</span></div>
+                <div className="text-slate-500">Current Class: <span className="font-semibold text-purple-700">
+                  {singlePromoteStudent.enrollments?.[0]?.section?.class?.title ? `${singlePromoteStudent.enrollments[0].section.class.title} - ` : ''}
+                  {singlePromoteStudent.enrollments?.[0]?.section?.title || 'Unassigned'}
+                </span></div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Target Academic Session *
+                </label>
+                <select
+                  value={targetSessionId || activeSessionId || ''}
+                  onChange={(e) => setTargetSessionId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 text-slate-800 bg-white font-medium"
+                  required
+                >
+                  <option value="">-- Select Academic Session --</option>
+                  {sessions.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} {s.id === activeSessionId ? '(Current Active Session)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Promote / Transfer To Class & Section *
+                </label>
+                <select
+                  value={targetSectionId}
+                  onChange={(e) => setTargetSectionId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 text-slate-800 bg-white font-medium"
+                  required
+                >
+                  <option value="">-- Select Target Class & Section --</option>
+                  {sectionsOptions.map(sec => (
+                    <option key={sec.id} value={sec.id}>
+                      {sec.classTitle} - {sec.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSinglePromoteStudent(null)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !targetSectionId}
+                  className="px-5 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <TrendingUp size={16} />
+                  {submitting ? 'Promoting...' : 'Promote Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: BULK PROMOTE STUDENTS */}
+      {isBulkPromoteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
+                <TrendingUp className="text-emerald-600" size={22} />
+                <h3>Bulk Class Promotion</h3>
+              </div>
+              <button 
+                onClick={() => setIsBulkPromoteModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePromoteStudents} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Target Academic Session *
+                </label>
+                <select
+                  value={targetSessionId || activeSessionId || ''}
+                  onChange={(e) => setTargetSessionId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 text-slate-800 bg-white font-medium"
+                  required
+                >
+                  <option value="">-- Select Academic Session --</option>
+                  {sessions.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} {s.id === activeSessionId ? '(Current Active Session)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    1. Source Class / Section
+                  </label>
+                  <select
+                    value={sourceSectionId}
+                    onChange={(e) => {
+                      const secId = e.target.value;
+                      setSourceSectionId(secId);
+                      if (secId) {
+                        const matching = students.filter(s => s.enrollments?.some(e => e.section?.id === secId)).map(s => s.id);
+                        setSelectedStudentIds(matching);
+                      } else {
+                        setSelectedStudentIds([]);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 text-slate-800 bg-white font-medium"
+                  >
+                    <option value="">-- All Enrolled Students --</option>
+                    {sectionsOptions.map(sec => (
+                      <option key={sec.id} value={sec.id}>
+                        {sec.classTitle} - {sec.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    2. Target Class / Section *
+                  </label>
+                  <select
+                    value={targetSectionId}
+                    onChange={(e) => setTargetSectionId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 text-slate-800 bg-white font-medium"
+                    required
+                  >
+                    <option value="">-- Select Target Class & Section --</option>
+                    {sectionsOptions.map(sec => (
+                      <option key={sec.id} value={sec.id}>
+                        {sec.classTitle} - {sec.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Student Checklist */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Select Students to Promote ({selectedStudentIds.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pool = sourceSectionId 
+                        ? students.filter(s => s.enrollments?.some(e => e.section?.id === sourceSectionId))
+                        : students;
+                      if (selectedStudentIds.length === pool.length) {
+                        setSelectedStudentIds([]);
+                      } else {
+                        setSelectedStudentIds(pool.map(s => s.id));
+                      }
+                    }}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                  >
+                    {selectedStudentIds.length === (sourceSectionId ? students.filter(s => s.enrollments?.some(e => e.section?.id === sourceSectionId)).length : students.length) ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+
+                <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-2xl p-2 divide-y divide-slate-100 bg-slate-50/50 space-y-1">
+                  {(sourceSectionId 
+                    ? students.filter(s => s.enrollments?.some(e => e.section?.id === sourceSectionId))
+                    : students
+                  ).map(s => {
+                    const isChecked = selectedStudentIds.includes(s.id);
+                    return (
+                      <label 
+                        key={s.id}
+                        className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                          isChecked ? 'bg-indigo-50/80 border border-indigo-200/60' : 'hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudentIds([...selectedStudentIds, s.id]);
+                              } else {
+                                setSelectedStudentIds(selectedStudentIds.filter(id => id !== s.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                          />
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs">{s.user.name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">ID: {s.enrollmentNo}</div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                          {s.enrollments?.[0]?.section?.class?.title ? `${s.enrollments[0].section.class.title} - ` : ''}
+                          {s.enrollments?.[0]?.section?.title || 'Unassigned'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkPromoteModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || selectedStudentIds.length === 0 || !targetSectionId}
+                  className="px-5 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <TrendingUp size={16} />
+                  {submitting ? 'Promoting...' : `Promote ${selectedStudentIds.length} Students`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification (z-[999999] at the bottom of DOM tree) */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
+            : 'bg-rose-600 text-white shadow-rose-600/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.text}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
+            <X size={16} />
+          </button>
         </div>
       )}
 

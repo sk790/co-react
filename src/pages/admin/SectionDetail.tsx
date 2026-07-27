@@ -19,9 +19,14 @@ import {
   Calendar,
   ChevronRight,
   Shield,
-  Briefcase
+  Briefcase,
+  Clock,
+  Plus,
+  Printer,
+  MapPin
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface UserInfo {
   id?: string;
@@ -58,12 +63,31 @@ interface SectionDetailData {
   id: string;
   title: string;
   capacity?: number;
+  roomNumber?: string;
   classId: string;
   teacherId?: string;
+  schoolId?: string;
   class?: ParentClass;
   teacher?: TeacherProfile;
   enrollments?: EnrollmentItem[];
   createdAt?: string;
+}
+
+interface PeriodItem {
+  id: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  subject: string;
+  instructorId: string;
+  sectionId: string;
+  schoolId?: string;
+  sessionId?: string;
+  instructor?: {
+    user?: {
+      name?: string;
+    };
+  };
 }
 
 export const SectionDetail: React.FC = () => {
@@ -75,15 +99,31 @@ export const SectionDetail: React.FC = () => {
   const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'students' | 'instructor'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'instructor' | 'timetable'>('students');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Timetable States
+  const [periods, setPeriods] = useState<PeriodItem[]>([]);
+  const [timetableLoading, setTimetableLoading] = useState(false);
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>('ALL');
+
   // Modal & Form States
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
     teacherId: '',
-    capacity: 40
+    capacity: 40,
+    roomNumber: ''
+  });
+
+  const [isAddPeriodModalOpen, setIsAddPeriodModalOpen] = useState(false);
+  const [periodForm, setPeriodForm] = useState({
+    dayOfWeek: 'MONDAY',
+    startTime: '09:00',
+    endTime: '09:45',
+    subject: '',
+    instructorId: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +152,8 @@ export const SectionDetail: React.FC = () => {
         setEditForm({
           title: data.title || '',
           teacherId: data.teacherId || data.teacher?.id || '',
-          capacity: data.capacity || 40
+          capacity: data.capacity || 40,
+          roomNumber: data.roomNumber || ''
         });
       } else {
         showToast('Could not load section details', 'error');
@@ -130,9 +171,28 @@ export const SectionDetail: React.FC = () => {
     }
   };
 
+  // Fetch Section Timetable Periods
+  const fetchTimetable = async () => {
+    if (!id) return;
+    setTimetableLoading(true);
+    try {
+      const res = await apiClient.get(`/lecture/section/${id}`);
+      if (res.data.success) {
+        setPeriods(res.data.data || []);
+      }
+    } catch (err: any) {
+      console.error('Error loading timetable:', err);
+    } finally {
+      setTimetableLoading(false);
+    }
+  };
+
+  const { activeSessionId } = useSessionStore();
+
   useEffect(() => {
     fetchSectionDetails(true);
-  }, [id]);
+    fetchTimetable();
+  }, [id, activeSessionId]);
 
   // Handle Edit Section
   const handleUpdateSection = async (e: React.FormEvent) => {
@@ -147,7 +207,8 @@ export const SectionDetail: React.FC = () => {
       const res = await apiClient.put(`/sections/${id}`, {
         title: editForm.title.trim(),
         teacherId: editForm.teacherId || undefined,
-        capacity: Number(editForm.capacity) || 40
+        capacity: Number(editForm.capacity) || 40,
+        roomNumber: editForm.roomNumber.trim() || undefined
       });
 
       if (res.data.success) {
@@ -180,6 +241,186 @@ export const SectionDetail: React.FC = () => {
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Error deleting section', 'error');
     }
+  };
+
+  // Handle Add Timetable Period
+  const handleAddPeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !periodForm.subject.trim() || !periodForm.instructorId) {
+      const msg = 'Subject Name and Instructor selection are required';
+      setModalError(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    setModalError(null);
+    try {
+      const payload = {
+        dayOfWeek: periodForm.dayOfWeek,
+        startTime: periodForm.startTime,
+        endTime: periodForm.endTime,
+        subject: periodForm.subject.trim(),
+        instructorId: periodForm.instructorId,
+        sectionId: id,
+        schoolId: section?.schoolId
+      };
+
+      const res = await apiClient.post('/lecture', payload);
+      if (res.data.success) {
+        showToast('Timetable period scheduled successfully!');
+        setIsAddPeriodModalOpen(false);
+        setModalError(null);
+        setPeriodForm({
+          dayOfWeek: 'MONDAY',
+          startTime: '09:00',
+          endTime: '09:45',
+          subject: '',
+          instructorId: ''
+        });
+        fetchTimetable();
+      } else {
+        const msg = res.data.message || 'Failed to schedule period';
+        setModalError(msg);
+        showToast(msg, 'error');
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Error scheduling period';
+      setModalError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Delete Period
+  const handleDeletePeriod = async (periodId: string) => {
+    if (!window.confirm('Are you sure you want to remove this timetable period?')) return;
+
+    try {
+      const res = await apiClient.delete(`/lecture/${periodId}`);
+      if (res.data.success) {
+        showToast('Period deleted!');
+        fetchTimetable();
+      } else {
+        showToast(res.data.message || 'Failed to delete period', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error deleting period', 'error');
+    }
+  };
+
+  // Handle Print Timetable (Day or Full Week)
+  const handlePrintTimetable = (mode: 'day' | 'week') => {
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) {
+      showToast('Popup blocked! Please allow popups to print timetable.', 'error');
+      return;
+    }
+
+    const targetDay = selectedDayFilter;
+    const daysList = (mode === 'day' && targetDay !== 'ALL')
+      ? [targetDay]
+      : ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+    const documentTitle = `Timetable_${section?.class?.title || 'Class'}_${section?.title || 'Section'}_${mode === 'day' ? targetDay : 'FullWeek'}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${documentTitle}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+            body { font-family: 'Inter', system-ui, -apple-system, sans-serif; padding: 32px; color: #0f172a; bg: #ffffff; }
+            .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #4338ca; padding-bottom: 16px; }
+            .header h1 { margin: 0; font-size: 26px; color: #312e81; font-weight: 800; tracking-tight; }
+            .header p { margin: 6px 0 0; font-size: 13px; color: #64748b; font-weight: 600; }
+            .meta-grid { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px; font-size: 12px; font-weight: 600; }
+            .meta-item { display: flex; gap: 6px; }
+            .meta-label { color: #64748b; }
+            .meta-val { color: #0f172a; font-weight: 700; }
+            .day-title { margin: 20px 0 10px; font-size: 15px; color: #4338ca; font-weight: 800; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; }
+            th { background-color: #f1f5f9; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .subject { font-weight: 700; color: #312e81; font-size: 13px; }
+            .teacher { font-size: 11px; color: #059669; font-weight: 600; }
+            .time { font-weight: 700; color: #2563eb; }
+            .empty-msg { text-align: center; color: #94a3b8; font-style: italic; padding: 12px; }
+            .footer { margin-top: 48px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+            .sig-box { text-align: center; border-top: 1px solid #94a3b8; width: 180px; padding-top: 4px; font-weight: 600; color: #334155; }
+            @media print {
+              body { padding: 0; }
+              @page { margin: 1.5cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CLASSORBIT ACADEMIC ROUTINE</h1>
+            <p>Official Timetable Schedule Sheet</p>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-item"><span class="meta-label">Class:</span> <span class="meta-val">${section?.class?.title || 'Class'}</span></div>
+            <div class="meta-item"><span class="meta-label">Section:</span> <span class="meta-val">${section?.title || 'Section'}</span></div>
+            <div class="meta-item"><span class="meta-label">Section Instructor:</span> <span class="meta-val">${section?.teacher?.user?.name || 'Unassigned'}</span></div>
+            <div class="meta-item"><span class="meta-label">Report Mode:</span> <span class="meta-val">${mode === 'day' ? `${targetDay} Routine` : 'Full Week Master Schedule'}</span></div>
+          </div>
+
+          ${daysList.map(day => {
+            const dayPeriods = periods.filter(p => p.dayOfWeek === day);
+            if (mode === 'week' && dayPeriods.length === 0) return '';
+            return `
+              <div>
+                <div class="day-title">📅 ${day}</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 25%;">Time Period</th>
+                      <th style="width: 40%;">Subject Name</th>
+                      <th style="width: 35%;">Assigned Instructor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${dayPeriods.length === 0 ? `
+                      <tr><td colspan="3" class="empty-msg">No classes scheduled for ${day}</td></tr>
+                    ` : dayPeriods.map(p => `
+                      <tr>
+                        <td class="time">⏰ ${p.startTime} - ${p.endTime}</td>
+                        <td class="subject">📘 ${p.subject}</td>
+                        <td class="teacher">👨‍🏫 ${p.instructor?.user?.name || 'Assigned Instructor'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `;
+          }).join('')}
+
+          <div class="footer">
+            <div>
+              <div>Generated: ${new Date().toLocaleString()}</div>
+              <div>ClassOrbit Smart School Management</div>
+            </div>
+            <div class="sig-box">
+              Authorized Principal Signature
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   // Enrolled Students list
@@ -236,21 +477,6 @@ export const SectionDetail: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
-            : 'bg-rose-600 text-white shadow-rose-600/20'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.text}</span>
-          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
-            <X size={16} />
-          </button>
-        </div>
-      )}
 
       {/* Navigation Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -283,8 +509,15 @@ export const SectionDetail: React.FC = () => {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-indigo-200/80 mt-1">
-                Academic Section • Instructor: <span className="font-bold text-white">{section.teacher?.user?.name || 'Unassigned'}</span>
+              <p className="text-sm text-indigo-200/80 mt-1 flex items-center gap-3 flex-wrap">
+                <span>Academic Section</span>
+                <span>•</span>
+                <span className="flex items-center gap-1 font-semibold text-white">
+                  <MapPin size={13} className="text-indigo-300" />
+                  Room: {section.roomNumber || 'Not Assigned'}
+                </span>
+                <span>•</span>
+                <span>Instructor: <span className="font-bold text-white">{section.teacher?.user?.name || 'Unassigned'}</span></span>
               </p>
             </div>
           </div>
@@ -310,7 +543,7 @@ export const SectionDetail: React.FC = () => {
       </div>
 
       {/* Overview Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
             <GraduationCap size={22} />
@@ -323,10 +556,22 @@ export const SectionDetail: React.FC = () => {
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+            <MapPin size={22} />
+          </div>
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Room / Lab</span>
+            <div className="text-lg font-extrabold text-slate-900 mt-0.5 truncate max-w-[140px]">
+              {section.roomNumber || 'Not Assigned'}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
             <Users size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Seat Capacity / Remaining</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Seat Capacity / Free</span>
             <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
               {enrolledCount} / {totalCapacity} <span className="text-xs text-emerald-600 font-semibold">({availableSeats} free)</span>
             </div>
@@ -339,7 +584,7 @@ export const SectionDetail: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Section Instructor</span>
-            <div className="text-base font-bold text-slate-900 mt-0.5 truncate max-w-[180px]">
+            <div className="text-base font-bold text-slate-900 mt-0.5 truncate max-w-[160px]">
               {section.teacher?.id && section.teacher?.user?.name ? (
                 <Link to={`/admin/teachers/${section.teacher.id}`} className="hover:text-purple-600 transition-colors">
                   {section.teacher.user.name}
@@ -376,6 +621,17 @@ export const SectionDetail: React.FC = () => {
           >
             <UserCheck size={15} />
             Instructor & Info
+          </button>
+          <button
+            onClick={() => setActiveTab('timetable')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'timetable' 
+                ? 'bg-white text-indigo-700 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Clock size={15} />
+            Timetable & Schedule ({periods.length})
           </button>
         </div>
 
@@ -550,6 +806,11 @@ export const SectionDetail: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="font-semibold text-slate-600">Room / Lab Location:</span>
+                <span className="font-bold text-indigo-700">{section.roomNumber || 'Not Assigned'}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="font-semibold text-slate-600">Creation Date:</span>
                 <span className="font-bold text-slate-900">
                   {section.createdAt ? new Date(section.createdAt).toLocaleDateString() : 'N/A'}
@@ -557,6 +818,143 @@ export const SectionDetail: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB 3: TIMETABLE & SCHEDULE */}
+      {activeTab === 'timetable' && (
+        <div className="space-y-6">
+          {/* Timetable Header & Day Filter */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
+              {['ALL', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDayFilter(day)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    selectedDayFilter === day
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+              <button
+                onClick={() => handlePrintTimetable('week')}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all active:scale-95"
+                title="Print Complete Weekly Master Timetable Sheet"
+              >
+                <Printer size={15} className="text-indigo-600" />
+                Print Timetable
+              </button>
+
+              <button
+                onClick={() => {
+                  setPeriodForm({
+                    dayOfWeek: selectedDayFilter !== 'ALL' ? selectedDayFilter : 'MONDAY',
+                    startTime: '09:00',
+                    endTime: '09:45',
+                    subject: '',
+                    instructorId: section.teacherId || section.teacher?.id || teachers[0]?.id || ''
+                  });
+                  setIsAddPeriodModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20 active:scale-95"
+              >
+                <Plus size={16} /> Schedule Period
+              </button>
+            </div>
+          </div>
+
+          {/* Timetable Grid / List */}
+          {timetableLoading ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 space-y-4 animate-pulse">
+              <div className="h-16 bg-slate-100 rounded-xl w-full"></div>
+              <div className="h-16 bg-slate-100 rounded-xl w-full"></div>
+            </div>
+          ) : periods.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+              <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Clock size={32} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-lg mb-1">No Timetable Periods Scheduled</h4>
+              <p className="text-slate-500 text-xs max-w-sm mx-auto mb-6">
+                Create subject schedules and assign teachers to time slots for {section.title}.
+              </p>
+              <button
+                onClick={() => {
+                  setPeriodForm({
+                    dayOfWeek: 'MONDAY',
+                    startTime: '09:00',
+                    endTime: '09:45',
+                    subject: '',
+                    instructorId: section.teacherId || section.teacher?.id || teachers[0]?.id || ''
+                  });
+                  setIsAddPeriodModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+              >
+                <Plus size={16} /> Schedule First Period
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Day</th>
+                      <th className="px-6 py-4">Time Slot</th>
+                      <th className="px-6 py-4">Subject</th>
+                      <th className="px-6 py-4">Assigned Instructor</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {periods
+                      .filter(p => selectedDayFilter === 'ALL' || p.dayOfWeek === selectedDayFilter)
+                      .map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-900">
+                            <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[11px]">
+                              {p.dayOfWeek}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-800">
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={14} className="text-slate-400" />
+                              <span>{p.startTime} - {p.endTime}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-indigo-700 text-sm">
+                            {p.subject}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-700">
+                            <div className="flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-emerald-600" />
+                              <span>{p.instructor?.user?.name || 'Assigned Instructor'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => handleDeletePeriod(p.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              title="Delete Period"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -609,16 +1007,31 @@ export const SectionDetail: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Capacity Seats
-                </label>
-                <input
-                  type="number"
-                  value={editForm.capacity}
-                  onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Capacity Seats
+                  </label>
+                  <input
+                    type="number"
+                    value={editForm.capacity}
+                    onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Room No. / Lab
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 102"
+                    value={editForm.roomNumber}
+                    onChange={(e) => setEditForm({ ...editForm, roomNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -639,6 +1052,137 @@ export const SectionDetail: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD TIMETABLE PERIOD */}
+      {isAddPeriodModalOpen && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
+                <Clock className="text-purple-600" size={20} />
+                <h3>Schedule Timetable Period</h3>
+              </div>
+              <button 
+                onClick={() => setIsAddPeriodModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPeriod} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Day of Week *
+                </label>
+                <select
+                  value={periodForm.dayOfWeek}
+                  onChange={(e) => setPeriodForm({ ...periodForm, dayOfWeek: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
+                  required
+                >
+                  {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Subject Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mathematics"
+                  value={periodForm.subject}
+                  onChange={(e) => setPeriodForm({ ...periodForm, subject: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Assigned Instructor *
+                </label>
+                <select
+                  value={periodForm.instructorId}
+                  onChange={(e) => setPeriodForm({ ...periodForm, instructorId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white"
+                  required
+                >
+                  <option value="">-- Select Instructor --</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.user?.name || 'Unnamed Teacher'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Start Time *
+                  </label>
+                  <input
+                    type="time"
+                    value={periodForm.startTime}
+                    onChange={(e) => setPeriodForm({ ...periodForm, startTime: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    End Time *
+                  </label>
+                  <input
+                    type="time"
+                    value={periodForm.endTime}
+                    onChange={(e) => setPeriodForm({ ...periodForm, endTime: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPeriodModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all shadow-md shadow-purple-600/20 disabled:opacity-50"
+                >
+                  {submitting ? 'Scheduling...' : 'Schedule Period'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification (z-[999999] at the bottom of DOM tree) */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
+            : 'bg-rose-600 text-white shadow-rose-600/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.text}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
+            <X size={16} />
+          </button>
         </div>
       )}
 

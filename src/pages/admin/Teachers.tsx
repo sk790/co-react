@@ -80,6 +80,7 @@ export const Teachers: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   // Comprehensive Add Teacher Form State
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addFormTab, setAddFormTab] = useState<'personal' | 'professional' | 'contact'>('personal');
 
@@ -160,11 +161,14 @@ export const Teachers: React.FC = () => {
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.name.trim() || !addForm.email.trim()) {
-      showToast('Full Name and Email Address are required', 'error');
+      const msg = 'Full Name and Email Address are required';
+      setModalError(msg);
+      showToast(msg, 'error');
       return;
     }
 
     setSubmitting(true);
+    setModalError(null);
     try {
       // Format payload according to schema
       const payload: any = {
@@ -191,13 +195,18 @@ export const Teachers: React.FC = () => {
       if (res.data.success) {
         showToast('Teacher onboarded successfully!');
         setIsAddModalOpen(false);
+        setModalError(null);
         setAddForm(initialAddFormState);
         fetchInitialData(false);
       } else {
-        showToast(res.data.message || 'Failed to onboard teacher', 'error');
+        const msg = res.data.message || 'Failed to onboard teacher';
+        setModalError(msg);
+        showToast(msg, 'error');
       }
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Error onboarding teacher', 'error');
+      const msg = err.response?.data?.message || 'Error onboarding teacher';
+      setModalError(msg);
+      showToast(msg, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -273,21 +282,6 @@ export const Teachers: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
-            : 'bg-rose-600 text-white shadow-rose-600/20'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.text}</span>
-          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
-            <X size={16} />
-          </button>
-        </div>
-      )}
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-6 rounded-2xl shadow-xl border border-indigo-900/30">
@@ -1081,6 +1075,21 @@ export const Teachers: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification (z-[999999] at the bottom of DOM tree) */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
+            : 'bg-rose-600 text-white shadow-rose-600/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.text}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
+            <X size={16} />
+          </button>
         </div>
       )}
 

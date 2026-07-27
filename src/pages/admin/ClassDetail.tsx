@@ -19,9 +19,11 @@ import {
   MoreVertical,
   ChevronRight,
   Grid,
-  List
+  List,
+  MapPin
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface TeacherUser {
   name?: string;
@@ -87,14 +89,16 @@ export const ClassDetail: React.FC = () => {
   const [sectionForm, setSectionForm] = useState({
     title: '',
     teacherId: '',
-    capacity: 40
+    capacity: 40,
+    roomNumber: ''
   });
 
   const [editingSection, setEditingSection] = useState<SectionItem | null>(null);
   const [editSectionForm, setEditSectionForm] = useState({
     title: '',
     teacherId: '',
-    capacity: 40
+    capacity: 40,
+    roomNumber: ''
   });
 
   const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
@@ -146,9 +150,11 @@ export const ClassDetail: React.FC = () => {
     }
   };
 
+  const { activeSessionId } = useSessionStore();
+
   useEffect(() => {
     fetchClassDetails(true);
-  }, [id]);
+  }, [id, activeSessionId]);
 
   // Handle Add Section
   const handleAddSection = async (e: React.FormEvent) => {
@@ -164,13 +170,14 @@ export const ClassDetail: React.FC = () => {
         classId: id,
         title: sectionForm.title.trim(),
         teacherId: sectionForm.teacherId || undefined,
-        capacity: Number(sectionForm.capacity) || 40
+        capacity: Number(sectionForm.capacity) || 40,
+        roomNumber: sectionForm.roomNumber.trim() || undefined
       });
 
       if (res.data.success) {
         showToast(`Section "${sectionForm.title}" added successfully!`);
         setIsAddSectionModalOpen(false);
-        setSectionForm({ title: '', teacherId: '', capacity: 40 });
+        setSectionForm({ title: '', teacherId: '', capacity: 40, roomNumber: '' });
         fetchClassDetails(false);
       } else {
         showToast(res.data.message || 'Failed to create section', 'error');
@@ -195,7 +202,8 @@ export const ClassDetail: React.FC = () => {
       const res = await apiClient.put(`/sections/${editingSection.id}`, {
         title: editSectionForm.title.trim(),
         teacherId: editSectionForm.teacherId || undefined,
-        capacity: Number(editSectionForm.capacity) || undefined
+        capacity: Number(editSectionForm.capacity) || undefined,
+        roomNumber: editSectionForm.roomNumber.trim() || undefined
       });
 
       if (res.data.success) {
@@ -580,7 +588,8 @@ export const ClassDetail: React.FC = () => {
                             setEditSectionForm({
                               title: sec.title,
                               teacherId: sec.teacherId || sec.teacher?.id || '',
-                              capacity: sec.capacity || 40
+                              capacity: sec.capacity || 40,
+                              roomNumber: sec.roomNumber || ''
                             });
                           }}
                           className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -599,11 +608,23 @@ export const ClassDetail: React.FC = () => {
                     </div>
 
                     {/* Section Instructor & Student Stats */}
-                    <div className="p-5 space-y-4 text-xs">
+                    <div className="p-5 space-y-3 text-xs">
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span className="text-slate-500 font-semibold">Room No. / Lab:</span>
+                        {sec.roomNumber ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-[11px]">
+                            <MapPin size={11} className="text-indigo-600" />
+                            {sec.roomNumber}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">Not Assigned</span>
+                        )}
+                      </div>
+
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <UserCheck size={16} className="text-purple-600" />
-                          <span className="font-semibold text-slate-700">Section Instructor:</span>
+                          <span className="font-semibold text-slate-700">Instructor:</span>
                         </div>
                         {sec.teacher?.id && sec.teacher?.user?.name ? (
                           <Link to={`/admin/teachers/${sec.teacher.id}`} className="font-bold text-slate-900 hover:text-purple-600 transition-colors">
@@ -640,6 +661,7 @@ export const ClassDetail: React.FC = () => {
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold tracking-wider">
                     <tr>
                       <th className="px-6 py-4">Section Title</th>
+                      <th className="px-6 py-4">Room No. / Lab</th>
                       <th className="px-6 py-4">Section Instructor</th>
                       <th className="px-6 py-4">Enrolled Students</th>
                       <th className="px-6 py-4">Capacity</th>
@@ -658,6 +680,16 @@ export const ClassDetail: React.FC = () => {
                               {sec.title}
                             </Link>
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {sec.roomNumber ? (
+                            <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 text-xs">
+                              <MapPin size={12} className="text-indigo-600" />
+                              {sec.roomNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Not Assigned</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-800">
                           {sec.teacher?.id && sec.teacher?.user?.name ? (
@@ -690,7 +722,8 @@ export const ClassDetail: React.FC = () => {
                                 setEditSectionForm({
                                   title: sec.title,
                                   teacherId: sec.teacherId || sec.teacher?.id || '',
-                                  capacity: sec.capacity || 40
+                                  capacity: sec.capacity || 40,
+                                  roomNumber: sec.roomNumber || ''
                                 });
                               }}
                               className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -824,17 +857,32 @@ export const ClassDetail: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Student Capacity
-                </label>
-                <input
-                  type="number"
-                  placeholder="40"
-                  value={sectionForm.capacity}
-                  onChange={(e) => setSectionForm({ ...sectionForm, capacity: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Student Capacity
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="40"
+                    value={sectionForm.capacity}
+                    onChange={(e) => setSectionForm({ ...sectionForm, capacity: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Room No. / Lab
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 101"
+                    value={sectionForm.roomNumber}
+                    onChange={(e) => setSectionForm({ ...sectionForm, roomNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -908,16 +956,31 @@ export const ClassDetail: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Capacity
-                </label>
-                <input
-                  type="number"
-                  value={editSectionForm.capacity}
-                  onChange={(e) => setEditSectionForm({ ...editSectionForm, capacity: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Capacity
+                  </label>
+                  <input
+                    type="number"
+                    value={editSectionForm.capacity}
+                    onChange={(e) => setEditSectionForm({ ...editSectionForm, capacity: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Room No. / Lab
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 101"
+                    value={editSectionForm.roomNumber}
+                    onChange={(e) => setEditSectionForm({ ...editSectionForm, roomNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

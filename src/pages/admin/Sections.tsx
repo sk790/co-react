@@ -16,7 +16,8 @@ import {
   Grid, 
   List, 
   ChevronRight,
-  Hash
+  Hash,
+  MapPin
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 import { useSessionStore } from '../../store/sessionStore';
@@ -42,6 +43,7 @@ interface SectionItem {
   id: string;
   title: string;
   capacity?: number;
+  roomNumber?: string;
   createdAt?: string;
   class?: ClassInfo;
   teacher?: TeacherInfo;
@@ -76,14 +78,16 @@ export const Sections: React.FC = () => {
     title: '',
     classId: '',
     teacherId: '',
-    capacity: 40
+    capacity: 40,
+    roomNumber: ''
   });
 
   const [editingSection, setEditingSection] = useState<SectionItem | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     teacherId: '',
-    capacity: 40
+    capacity: 40,
+    roomNumber: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -155,14 +159,15 @@ export const Sections: React.FC = () => {
         title: createForm.title.trim(),
         classId: createForm.classId,
         teacherId: createForm.teacherId || undefined,
-        capacity: Number(createForm.capacity) || 40
+        capacity: Number(createForm.capacity) || 40,
+        roomNumber: createForm.roomNumber.trim() || undefined
       };
 
       const res = await apiClient.post('/sections', payload);
       if (res.data.success) {
         showToast('New section created successfully!');
         setIsCreateModalOpen(false);
-        setCreateForm({ title: '', classId: '', teacherId: '', capacity: 40 });
+        setCreateForm({ title: '', classId: '', teacherId: '', capacity: 40, roomNumber: '' });
         fetchInitialData(false);
       } else {
         showToast(res.data.message || 'Failed to create section', 'error');
@@ -184,7 +189,8 @@ export const Sections: React.FC = () => {
       const res = await apiClient.put(`/sections/${editingSection.id}`, {
         title: editForm.title.trim(),
         teacherId: editForm.teacherId, // sending "" clears instructor
-        capacity: Number(editForm.capacity) || 40
+        capacity: Number(editForm.capacity) || 40,
+        roomNumber: editForm.roomNumber.trim() || undefined
       });
 
       if (res.data.success) {
@@ -237,12 +243,12 @@ export const Sections: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
-      {/* Toast Notification */}
+      {/* Toast Notification (z-[9999] so it floats above all modals) */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
+        <div className={`fixed top-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
           toast.type === 'success' 
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
-            : 'bg-rose-600 text-white shadow-rose-600/20'
+            ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
+            : 'bg-rose-600 text-white shadow-rose-600/30'
         }`}>
           {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
           <span>{toast.text}</span>
@@ -398,7 +404,8 @@ export const Sections: React.FC = () => {
                   title: '',
                   classId: classesList[0]?.id || '',
                   teacherId: '',
-                  capacity: 40
+                  capacity: 40,
+                  roomNumber:''
                 });
                 setIsCreateModalOpen(true);
               }}
@@ -418,6 +425,7 @@ export const Sections: React.FC = () => {
                 <tr>
                   <th className="px-6 py-4">Section Title</th>
                   <th className="px-6 py-4">Parent Class</th>
+                  <th className="px-6 py-4">Room No. / Lab</th>
                   <th className="px-6 py-4">Assigned Instructor</th>
                   <th className="px-6 py-4">Enrolled Capacity</th>
                   <th className="px-6 py-4 text-right">Actions</th>
@@ -454,6 +462,16 @@ export const Sections: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4">
+                        {sec.roomNumber ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 text-xs">
+                            <MapPin size={12} className="text-indigo-600" />
+                            {sec.roomNumber}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">Not Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
                         {sec.teacher?.id ? (
                           <Link 
                             to={`/admin/teachers/${sec.teacher.id}`}
@@ -481,7 +499,8 @@ export const Sections: React.FC = () => {
                               setEditForm({
                                 title: sec.title,
                                 teacherId: sec.teacher?.id || '',
-                                capacity: sec.capacity || 40
+                                capacity: sec.capacity || 40,
+                                roomNumber: sec.roomNumber || ''
                               });
                             }}
                             className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -547,7 +566,8 @@ export const Sections: React.FC = () => {
                           setEditForm({
                             title: sec.title,
                             teacherId: sec.teacher?.id || '',
-                            capacity: sec.capacity || 40
+                            capacity: sec.capacity || 40,
+                            roomNumber: sec.roomNumber || ''
                           });
                         }}
                         className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -565,6 +585,18 @@ export const Sections: React.FC = () => {
                   </div>
 
                   <div className="text-xs space-y-2">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span className="text-slate-400 font-medium">Room No. / Lab:</span>
+                      {sec.roomNumber ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-[11px]">
+                          <MapPin size={11} className="text-indigo-600" />
+                          {sec.roomNumber}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">Not Assigned</span>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between text-slate-600">
                       <span className="text-slate-400 font-medium">Instructor:</span>
                       {sec.teacher?.id ? (
@@ -670,17 +702,32 @@ export const Sections: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Student Seat Capacity
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.capacity}
-                  onChange={(e) => setCreateForm({ ...createForm, capacity: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Seat Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={createForm.capacity}
+                    onChange={(e) => setCreateForm({ ...createForm, capacity: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Room No. / Lab
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 102 / Lab 3"
+                    value={createForm.roomNumber}
+                    onChange={(e) => setCreateForm({ ...createForm, roomNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -751,17 +798,32 @@ export const Sections: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Student Seat Capacity
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={editForm.capacity}
-                  onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Seat Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editForm.capacity}
+                    onChange={(e) => setEditForm({ ...editForm, capacity: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Room No. / Lab
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 102"
+                    value={editForm.roomNumber}
+                    onChange={(e) => setEditForm({ ...editForm, roomNumber: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
