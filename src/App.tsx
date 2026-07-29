@@ -27,6 +27,7 @@ import { RolesPermissions } from './pages/admin/RolesPermissions';
 import { AcademicSessions } from './pages/admin/AcademicSessions';
 import { Parents } from './pages/admin/Parents';
 import { Timetables } from './pages/admin/Timetables';
+import { Transport } from './pages/admin/Transport';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -69,6 +70,10 @@ function App() {
             <Route path="/admin/sections" element={<Sections />} />
             <Route path="/admin/sections/:id" element={<SectionDetail />} />
             <Route path="/admin/timetables" element={<Timetables />} />
+            <Route path="/admin/transport" element={<Transport defaultTab="vehicles" />} />
+            <Route path="/admin/transport/vehicles" element={<Transport defaultTab="vehicles" />} />
+            <Route path="/admin/transport/routes" element={<Transport defaultTab="routes" />} />
+            <Route path="/admin/transport/drivers" element={<Transport defaultTab="drivers" />} />
             <Route path="/admin/sessions" element={<AcademicSessions />} />
             <Route path="/admin/roles-permissions" element={<RolesPermissions />} />
             <Route path="/admin/settings" element={<Settings />} />

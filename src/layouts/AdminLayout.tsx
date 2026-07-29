@@ -28,6 +28,8 @@ import {
   ShieldCheck,
   UserCircle,
   Clock,
+  Bus,
+  MapPin,
   Plus
 } from 'lucide-react';
 
@@ -42,6 +44,9 @@ export const AdminLayout = () => {
   const [academicDropdownOpen, setAcademicDropdownOpen] = useState(
     location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')
   );
+  const [transportDropdownOpen, setTransportDropdownOpen] = useState(
+    location.pathname.startsWith('/admin/transport')
+  );
 
   useEffect(() => {
     fetchSessions();
@@ -50,6 +55,9 @@ export const AdminLayout = () => {
   useEffect(() => {
     if (location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')) {
       setAcademicDropdownOpen(true);
+    }
+    if (location.pathname.startsWith('/admin/transport')) {
+      setTransportDropdownOpen(true);
     }
   }, [location.pathname]);
 
@@ -187,6 +195,87 @@ export const AdminLayout = () => {
                 >
                   <Layers size={15} className="text-purple-300" />
                   <span>Sections</span>
+                </NavLink>
+              </div>
+            </div>
+          </div>
+
+          {/* Transport Collapsible Dropdown */}
+          <div className="py-0.5">
+            <button
+              onClick={() => setTransportDropdownOpen(!transportDropdownOpen)}
+              className={`
+                w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm
+                ${location.pathname.startsWith('/admin/transport')
+                  ? 'bg-indigo-800/80 text-white font-medium'
+                  : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <Bus size={20} className="text-amber-400 group-hover:text-amber-300" />
+                <span>Transport</span>
+              </div>
+              <ChevronDown 
+                size={16} 
+                className={`text-indigo-300 transition-transform duration-300 ease-in-out ${transportDropdownOpen ? 'rotate-180' : ''}`} 
+              />
+            </button>
+
+            {/* Smooth Collapsible Submenu with CSS Grid Animation */}
+            <div className={`
+              grid transition-all duration-300 ease-in-out overflow-hidden
+              ${transportDropdownOpen 
+                ? 'grid-rows-[1fr] opacity-100 mt-1' 
+                : 'grid-rows-[0fr] opacity-0 mt-0'
+              }
+            `}>
+              <div className="min-h-0 ml-4 pl-3 border-l-2 border-indigo-700/60 space-y-1">
+                <NavLink
+                  to="/admin/transport/vehicles"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <Bus size={15} className="text-amber-300" />
+                  <span>Vehicles</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/transport/routes"
+                  end
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <MapPin size={15} className="text-purple-300" />
+                  <span>Routes</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/transport/drivers"
+                  end
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <UserCircle size={15} className="text-indigo-300" />
+                  <span>Drivers & Staff</span>
                 </NavLink>
               </div>
             </div>
