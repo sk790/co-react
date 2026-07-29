@@ -125,6 +125,7 @@ export const SectionDetail: React.FC = () => {
   });
 
   const [isAddPeriodModalOpen, setIsAddPeriodModalOpen] = useState(false);
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
   const [periodForm, setPeriodForm] = useState({
     dayOfWeek: 'MONDAY',
     startTime: '09:00',
@@ -250,7 +251,7 @@ export const SectionDetail: React.FC = () => {
     }
   };
 
-  // Handle Add Timetable Period
+  // Handle Add / Edit Timetable Period
   const handleAddPeriod = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !periodForm.subject.trim() || !periodForm.instructorId) {
@@ -273,10 +274,14 @@ export const SectionDetail: React.FC = () => {
         schoolId: section?.schoolId
       };
 
-      const res = await apiClient.post('/lecture', payload);
+      const res = editingPeriodId
+        ? await apiClient.put(`/lecture/${editingPeriodId}`, payload)
+        : await apiClient.post('/lecture', payload);
+
       if (res.data.success) {
-        showToast('Timetable period scheduled successfully!');
+        showToast(editingPeriodId ? 'Period updated successfully!' : 'Timetable period scheduled successfully!');
         setIsAddPeriodModalOpen(false);
+        setEditingPeriodId(null);
         setModalError(null);
         setPeriodForm({
           dayOfWeek: 'MONDAY',
@@ -287,12 +292,12 @@ export const SectionDetail: React.FC = () => {
         });
         fetchTimetable();
       } else {
-        const msg = res.data.message || 'Failed to schedule period';
+        const msg = res.data.message || 'Failed to save period';
         setModalError(msg);
         showToast(msg, 'error');
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Error scheduling period';
+      const msg = err.response?.data?.message || 'Error saving period';
       setModalError(msg);
       showToast(msg, 'error');
     } finally {
@@ -948,6 +953,23 @@ export const SectionDetail: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button
+                              onClick={() => {
+                                setEditingPeriodId(p.id);
+                                setPeriodForm({
+                                  dayOfWeek: p.dayOfWeek,
+                                  startTime: p.startTime,
+                                  endTime: p.endTime,
+                                  subject: p.subject || '',
+                                  instructorId: p.instructorId || ''
+                                });
+                                setIsAddPeriodModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1"
+                              title="Edit Period"
+                            >
+                              <Edit3 size={15} />
+                            </button>
+                            <button
                               onClick={() => handleDeletePeriod(p.id)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                               title="Delete Period"
@@ -1079,7 +1101,7 @@ export const SectionDetail: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
                 <Clock className="text-purple-600" size={20} />
-                <h3>Schedule Timetable Period</h3>
+                <h3>{editingPeriodId ? 'Edit Timetable Period' : 'Schedule Timetable Period'}</h3>
               </div>
               <button 
                 onClick={() => setIsAddPeriodModalOpen(false)} 
@@ -1198,7 +1220,7 @@ export const SectionDetail: React.FC = () => {
                   disabled={submitting}
                   className="px-5 py-2 text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all shadow-md shadow-purple-600/20 disabled:opacity-50"
                 >
-                  {submitting ? 'Scheduling...' : 'Schedule Period'}
+                  {submitting ? 'Saving...' : editingPeriodId ? 'Update Period' : 'Schedule Period'}
                 </button>
               </div>
             </form>

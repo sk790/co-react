@@ -73,6 +73,7 @@ interface ClassDetailItem {
   title: string;
   description?: string;
   classTeacherId?: string;
+  classTeacher?: TeacherProfile;
   sections?: SectionItem[];
   createdAt?: string;
 }
@@ -110,7 +111,8 @@ export const ClassDetail: React.FC = () => {
   const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
   const [editClassForm, setEditClassForm] = useState({
     title: '',
-    description: ''
+    description: '',
+    classTeacherId: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -138,7 +140,8 @@ export const ClassDetail: React.FC = () => {
         setClassData(fetchedClass);
         setEditClassForm({
           title: fetchedClass.title || '',
-          description: fetchedClass.description || ''
+          description: fetchedClass.description || '',
+          classTeacherId: fetchedClass.classTeacherId || ''
         });
       } else {
         showToast('Could not load class details', 'error');
@@ -165,7 +168,7 @@ export const ClassDetail: React.FC = () => {
   // Handle Add Section
   const handleAddSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !sectionForm.title.trim()) {
+    if (!id || !(sectionForm.title || '').trim()) {
       showToast('Section title is required', 'error');
       return;
     }
@@ -174,10 +177,10 @@ export const ClassDetail: React.FC = () => {
     try {
       const res = await apiClient.post('/sections', {
         classId: id,
-        title: sectionForm.title.trim(),
+        title: (sectionForm.title || '').trim(),
         teacherId: sectionForm.teacherId || undefined,
         capacity: Number(sectionForm.capacity) || 40,
-        roomNumber: sectionForm.roomNumber.trim() || undefined
+        roomNumber: (sectionForm.roomNumber || '').trim() || undefined
       });
 
       if (res.data.success) {
@@ -198,7 +201,7 @@ export const ClassDetail: React.FC = () => {
   // Handle Update Section
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSection || !editSectionForm.title.trim()) {
+    if (!editingSection || !(editSectionForm.title || '').trim()) {
       showToast('Section title is required', 'error');
       return;
     }
@@ -206,10 +209,10 @@ export const ClassDetail: React.FC = () => {
     setSubmitting(true);
     try {
       const res = await apiClient.put(`/sections/${editingSection.id}`, {
-        title: editSectionForm.title.trim(),
+        title: (editSectionForm.title || '').trim(),
         teacherId: editSectionForm.teacherId || undefined,
         capacity: Number(editSectionForm.capacity) || undefined,
-        roomNumber: editSectionForm.roomNumber.trim() || undefined
+        roomNumber: (editSectionForm.roomNumber || '').trim() || undefined
       });
 
       if (res.data.success) {
@@ -246,7 +249,7 @@ export const ClassDetail: React.FC = () => {
   // Handle Update Class Details
   const handleUpdateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !editClassForm.title.trim()) {
+    if (!id || !(editClassForm.title || '').trim()) {
       showToast('Class title is required', 'error');
       return;
     }
@@ -254,8 +257,9 @@ export const ClassDetail: React.FC = () => {
     setSubmitting(true);
     try {
       const res = await apiClient.put(`/classes/${id}`, {
-        title: editClassForm.title.trim(),
-        description: editClassForm.description.trim() || undefined
+        title: (editClassForm.title || '').trim(),
+        description: (editClassForm.description || '').trim() || undefined,
+        classTeacherId: editClassForm.classTeacherId || undefined
       });
 
       if (res.data.success) {
@@ -381,11 +385,17 @@ export const ClassDetail: React.FC = () => {
               <BookOpen size={28} />
             </div>
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-3xl font-extrabold tracking-tight">{classData.title}</h1>
                 <span className="px-3 py-1 bg-purple-500/20 border border-purple-400/30 text-purple-200 text-xs font-bold rounded-full">
                   {classData.sections?.length || 0} {classData.sections?.length === 1 ? 'Section' : 'Sections'}
                 </span>
+                {classData.classTeacher?.user?.name && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold rounded-full">
+                    <UserCheck size={13} />
+                    Class Teacher: {classData.classTeacher.user.name}
+                  </span>
+                )}
               </div>
               <p className="text-sm text-purple-200/80 mt-1 max-w-2xl">
                 {classData.description || 'No specific description set for this academic class.'}
@@ -401,7 +411,8 @@ export const ClassDetail: React.FC = () => {
               setSectionForm({ 
                 title: `Section ${String.fromCharCode(65 + (classData.sections?.length || 0))}`, 
                 teacherId: '', 
-                capacity: 40 
+                capacity: 40,
+                roomNumber: ''
               });
               setIsAddSectionModalOpen(true);
             }}
@@ -456,10 +467,15 @@ export const ClassDetail: React.FC = () => {
             <UserCheck size={22} />
           </div>
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned Instructors</span>
-            <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
-              {classData.sections?.filter(s => s.teacher?.user?.name).length || 0}
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Class Teacher</span>
+            <div className="text-base font-extrabold text-slate-900 mt-0.5 truncate max-w-[180px]">
+              {classData.classTeacher?.user?.name || 'Not Assigned'}
             </div>
+            {classData.classTeacher?.user?.email && (
+              <div className="text-xs text-slate-400 font-medium truncate max-w-[180px]">
+                {classData.classTeacher.user.email}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -893,7 +909,7 @@ export const ClassDetail: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Room No. / Lab
+                    Room No. / Lab <span className="text-slate-400 font-normal lowercase">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -1067,6 +1083,38 @@ export const ClassDetail: React.FC = () => {
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Class Teacher / In-charge
+                </label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="w-full flex items-center justify-between px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/20 text-slate-800 bg-white data-[state=open]:border-purple-300">
+                      <span>
+                        {editClassForm.classTeacherId 
+                          ? teachers.find(t => t.id === editClassForm.classTeacherId)?.user?.name || 'Unnamed Teacher'
+                          : "-- Select Class Teacher --"}
+                      </span>
+                      <ChevronRight size={16} className="text-slate-400 rotate-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px] p-1">
+                    <DropdownMenuItem onClick={() => setEditClassForm({ ...editClassForm, classTeacherId: '' })} className="cursor-pointer text-slate-500 italic">
+                      -- None / Unassigned --
+                    </DropdownMenuItem>
+                    {teachers.map(t => (
+                      <DropdownMenuItem 
+                        key={t.id} 
+                        onClick={() => setEditClassForm({ ...editClassForm, classTeacherId: t.id })}
+                        className="cursor-pointer"
+                      >
+                        {t.user?.name || 'Unnamed Teacher'} ({t.user?.email || 'No email'})
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div>

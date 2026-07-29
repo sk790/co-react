@@ -5,10 +5,21 @@ import { apiClient } from '../api/axios';
 export interface AcademicSession {
   id: string;
   title: string;
+  startDate?: string;
+  endDate?: string;
+  statusId?: string;
   createdAt: string;
   status: {
+    id?: string;
     title: string;
   };
+}
+
+export interface CreateSessionInput {
+  title: string;
+  startDate: string;
+  endDate: string;
+  statusId: string;
 }
 
 interface SessionState {
@@ -19,6 +30,8 @@ interface SessionState {
   
   setActiveSessionId: (id: string) => void;
   fetchSessions: () => Promise<void>;
+  createSession: (data: CreateSessionInput) => Promise<AcademicSession>;
+  deleteSession: (id: string) => Promise<void>;
   clearSessions: () => void;
 }
 
@@ -70,6 +83,40 @@ export const useSessionStore = create<SessionState>()(
             error: err.response?.data?.message || 'Error loading academic sessions', 
             isLoading: false 
           });
+        }
+      },
+
+      createSession: async (data: CreateSessionInput) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiClient.post('/academic-sessions', data);
+          if (response.data.success && response.data.data) {
+            const newSession = response.data.data;
+            await get().fetchSessions();
+            return newSession;
+          } else {
+            throw new Error(response.data.message || 'Failed to create session');
+          }
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || err.message || 'Error creating academic session';
+          set({ error: errorMsg, isLoading: false });
+          throw new Error(errorMsg);
+        }
+      },
+
+      deleteSession: async (id: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiClient.delete(`/academic-sessions/${id}`);
+          if (response.data.success) {
+            await get().fetchSessions();
+          } else {
+            throw new Error(response.data.message || 'Failed to delete session');
+          }
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || err.message || 'Error deleting session';
+          set({ error: errorMsg, isLoading: false });
+          throw new Error(errorMsg);
         }
       },
       

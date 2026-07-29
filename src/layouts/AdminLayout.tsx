@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useTenantStore } from '../store/tenantStore';
 import { useSessionStore } from '../store/sessionStore';
+import { CreateSessionModal } from '../components/CreateSessionModal';
 import { 
   LayoutDashboard, 
   Users, 
@@ -25,7 +26,9 @@ import {
   ChevronDown,
   Calendar,
   ShieldCheck,
-  UserCircle
+  UserCircle,
+  Clock,
+  Plus
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -35,6 +38,7 @@ export const AdminLayout = () => {
   const location = useLocation();
   // const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCreateSessionModalOpen, setIsCreateSessionModalOpen] = useState(false);
   const [academicDropdownOpen, setAcademicDropdownOpen] = useState(
     location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections')
   );
@@ -54,9 +58,11 @@ export const AdminLayout = () => {
     { name: 'Teachers', href: '/admin/teachers', icon: Users },
     { name: 'Students', href: '/admin/students', icon: GraduationCap },
     { name: 'Parents', href: '/admin/parents', icon: UserCircle },
+    { name: 'Timetables', href: '/admin/timetables', icon: Clock },
   ];
 
   const bottomNav = [
+    { name: 'Academic Sessions', href: '/admin/sessions', icon: Calendar },
     { name: 'Roles & Statuses', href: '/admin/roles-permissions', icon: ShieldCheck },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];
@@ -279,6 +285,16 @@ export const AdminLayout = () => {
                     )}
                   </DropdownMenuItem>
                 ))}
+                
+                <div className="border-t border-slate-100 pt-1 mt-1">
+                  <DropdownMenuItem
+                    onClick={() => setIsCreateSessionModalOpen(true)}
+                    className="flex items-center gap-2 cursor-pointer rounded-md px-2 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
+                  >
+                    <Plus size={14} />
+                    <span>Create New Session</span>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -317,6 +333,12 @@ export const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Create Session Modal */}
+      <CreateSessionModal
+        isOpen={isCreateSessionModalOpen}
+        onClose={() => setIsCreateSessionModalOpen(false)}
+      />
 
     </div>
   );

@@ -24,7 +24,9 @@ import { Sections } from './pages/admin/Sections';
 import { SectionDetail } from './pages/admin/SectionDetail';
 import { Settings } from './pages/admin/Settings';
 import { RolesPermissions } from './pages/admin/RolesPermissions';
+import { AcademicSessions } from './pages/admin/AcademicSessions';
 import { Parents } from './pages/admin/Parents';
+import { Timetables } from './pages/admin/Timetables';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -66,6 +68,8 @@ function App() {
             <Route path="/admin/classes/:id" element={<ClassDetail />} />
             <Route path="/admin/sections" element={<Sections />} />
             <Route path="/admin/sections/:id" element={<SectionDetail />} />
+            <Route path="/admin/timetables" element={<Timetables />} />
+            <Route path="/admin/sessions" element={<AcademicSessions />} />
             <Route path="/admin/roles-permissions" element={<RolesPermissions />} />
             <Route path="/admin/settings" element={<Settings />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

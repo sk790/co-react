@@ -164,7 +164,7 @@ export const Sections: React.FC = () => {
   // Handle Create Section
   const handleCreateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.title.trim() || !createForm.classId) {
+    if (!(createForm.title || '').trim() || !createForm.classId) {
       showToast('Section Title and Parent Class are required', 'error');
       return;
     }
@@ -172,11 +172,11 @@ export const Sections: React.FC = () => {
     setSubmitting(true);
     try {
       const payload = {
-        title: createForm.title.trim(),
+        title: (createForm.title || '').trim(),
         classId: createForm.classId,
         teacherId: createForm.teacherId || undefined,
         capacity: Number(createForm.capacity) || 40,
-        roomNumber: createForm.roomNumber.trim() || undefined
+        roomNumber: (createForm.roomNumber || '').trim() || undefined
       };
 
       const res = await apiClient.post('/sections', payload);
@@ -198,15 +198,15 @@ export const Sections: React.FC = () => {
   // Handle Update Section
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSection || !editForm.title.trim()) return;
+    if (!editingSection || !(editForm.title || '').trim()) return;
 
     setSubmitting(true);
     try {
       const res = await apiClient.put(`/sections/${editingSection.id}`, {
-        title: editForm.title.trim(),
+        title: (editForm.title || '').trim(),
         teacherId: editForm.teacherId, // sending "" clears instructor
         capacity: Number(editForm.capacity) || 40,
-        roomNumber: editForm.roomNumber.trim() || undefined
+        roomNumber: (editForm.roomNumber || '').trim() || undefined
       });
 
       if (res.data.success) {
@@ -801,7 +801,7 @@ export const Sections: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Room No. / Lab
+                    Room No. / Lab <span className="text-slate-400 font-normal lowercase">(optional)</span>
                   </label>
                   <input
                     type="text"

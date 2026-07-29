@@ -26,6 +26,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface UserData {
   id: string;
@@ -71,15 +72,37 @@ interface TeacherDetailItem {
   sections?: AssignedSectionItem[];
 }
 
+interface PeriodItem {
+  id: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  subject?: string;
+  section?: {
+    id: string;
+    title: string;
+    class?: {
+      id: string;
+      title: string;
+    };
+  };
+}
+
 export const TeacherDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { activeSessionId } = useSessionStore();
 
   // Component Data States
   const [teacher, setTeacher] = useState<TeacherDetailItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'sections'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'timetable' | 'sections'>('profile');
+
+  // Timetable States
+  const [periods, setPeriods] = useState<PeriodItem[]>([]);
+  const [timetableLoading, setTimetableLoading] = useState(false);
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>('ALL');
 
   // Edit Modal & Form State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -121,9 +144,26 @@ export const TeacherDetail: React.FC = () => {
     }
   };
 
+  // Fetch Teacher Timetable
+  const fetchTeacherTimetable = async () => {
+    if (!id) return;
+    setTimetableLoading(true);
+    try {
+      const res = await apiClient.get(`/lecture/teacher/${id}`);
+      if (res.data.success) {
+        setPeriods(res.data.data || []);
+      }
+    } catch (err: any) {
+      console.error('Error fetching teacher timetable:', err);
+    } finally {
+      setTimetableLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchTeacherDetails(true);
-  }, [id]);
+    fetchTeacherTimetable();
+  }, [id, activeSessionId]);
 
   // Handle Edit Submission
   const handleUpdateTeacher = async (e: React.FormEvent) => {
@@ -235,11 +275,14 @@ export const TeacherDetail: React.FC = () => {
         </button>
 
         <button
-          onClick={() => fetchTeacherDetails(false)}
+          onClick={() => {
+            fetchTeacherDetails(false);
+            fetchTeacherTimetable();
+          }}
           className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white bg-slate-100 rounded-xl transition-colors"
           title="Refresh Profile"
         >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={16} className={refreshing || timetableLoading ? 'animate-spin' : ''} />
         </button>
       </div>
 
@@ -357,10 +400,10 @@ export const TeacherDetail: React.FC = () => {
       </div>
 
       {/* Tab Controls */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'profile'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
@@ -369,8 +412,18 @@ export const TeacherDetail: React.FC = () => {
           <Users size={16} /> Profile Details
         </button>
         <button
+          onClick={() => setActiveTab('timetable')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            activeTab === 'timetable'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+          }`}
+        >
+          <Clock size={16} /> Timetable ({periods.length})
+        </button>
+        <button
           onClick={() => setActiveTab('sections')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'sections'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
@@ -503,7 +556,109 @@ export const TeacherDetail: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: ASSIGNED SECTIONS */}
+      {/* TAB 2: TEACHER TIMETABLE */}
+      {activeTab === 'timetable' && (
+        <div className="space-y-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Clock size={18} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Teacher Timetable</h3>
+                <p className="text-xs text-slate-500">Weekly class schedule for {teacher.user.name}</p>
+              </div>
+            </div>
+
+            {/* Day Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+              {['ALL', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDayFilter(day)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    selectedDayFilter === day
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {day === 'ALL' ? 'All Days' : day}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Timetable Content */}
+          {timetableLoading ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 space-y-4 animate-pulse">
+              <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
+              <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
+              <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
+            </div>
+          ) : periods.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
+              <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                <Clock size={32} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">No Timetable Periods Scheduled</h3>
+              <p className="text-slate-500 text-xs max-w-md mx-auto">
+                {teacher.user.name} does not have any periods scheduled in the timetable yet.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Day</th>
+                      <th className="px-6 py-4">Time Slot</th>
+                      <th className="px-6 py-4">Subject</th>
+                      <th className="px-6 py-4">Class & Section</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {periods
+                      .filter(p => selectedDayFilter === 'ALL' || p.dayOfWeek === selectedDayFilter)
+                      .map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold">
+                              {p.dayOfWeek}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-800 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={14} className="text-slate-400" />
+                              <span>{p.startTime} - {p.endTime}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-indigo-600 text-sm">
+                            {p.subject || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
+                            {p.section ? (
+                              <Link
+                                to={`/admin/sections/${p.section.id}`}
+                                className="inline-flex items-center gap-1 text-purple-700 font-bold hover:underline"
+                              >
+                                {p.section.class?.title || 'Class'} - {p.section.title}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">Unassigned</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: ASSIGNED SECTIONS */}
       {activeTab === 'sections' && (
         <div className="space-y-4">
           {(!teacher.sections || teacher.sections.length === 0) ? (
