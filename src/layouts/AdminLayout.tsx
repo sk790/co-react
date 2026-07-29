@@ -110,7 +110,7 @@ export const AdminLayout = () => {
         </div>
 
         {/* Sidebar Nav */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto sidebar-scrollbar">
           <div className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-4 px-2">
             Main Menu
           </div>

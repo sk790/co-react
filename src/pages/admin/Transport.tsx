@@ -84,6 +84,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [routes, setRoutes] = useState<TransportRouteItem[]>([]);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -114,7 +115,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
     registrationNo: '',
     capacity: 40,
     driverId: '',
-    status: 'ACTIVE'
+    statusId: ''
   });
 
   // Route Form State
@@ -126,7 +127,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
     pickupTime: '07:30 AM',
     dropTime: '03:30 PM',
     fare: 1500,
-    status: 'ACTIVE'
+    statusId: ''
   });
 
   // Driver Form State
@@ -151,10 +152,11 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
     else setRefreshing(true);
 
     try {
-      const [vehiclesRes, routesRes, driversRes] = await Promise.all([
+      const [vehiclesRes, routesRes, driversRes, statusesRes] = await Promise.all([
         apiClient.get('/vehicles'),
         apiClient.get('/routes'),
-        apiClient.get('/drivers')
+        apiClient.get('/drivers'),
+        apiClient.get('/master-data?type=STATUS')
       ]);
 
       if (vehiclesRes.data.success) {
@@ -165,6 +167,9 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       }
       if (driversRes.data.success) {
         setDrivers(driversRes.data.data || []);
+      }
+      if (statusesRes.data.success) {
+        setStatuses(statusesRes.data.data.filter((s: any) => s.type === 'STATUS'));
       }
     } catch (err: any) {
       console.error('Error fetching transport data:', err);
@@ -188,7 +193,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       registrationNo: '',
       capacity: 40,
       driverId: '',
-      status: 'ACTIVE'
+      statusId: statuses.length > 0 ? statuses[0].id : ''
     });
     setModalError(null);
     setIsVehicleModalOpen(true);
@@ -202,7 +207,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       registrationNo: v.registrationNo || '',
       capacity: v.capacity || 40,
       driverId: v.driverId || v.driver?.id || '',
-      status: v.status || 'ACTIVE'
+      statusId: v.status?.id || v.statusId || (statuses.length > 0 ? statuses[0].id : '')
     });
     setModalError(null);
     setIsVehicleModalOpen(true);
@@ -225,7 +230,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
         registrationNo: vehicleForm.registrationNo.trim() || undefined,
         capacity: Number(vehicleForm.capacity),
         driverId: vehicleForm.driverId || undefined,
-        status: vehicleForm.status
+        statusId: vehicleForm.statusId || undefined
       };
 
       const res = editingVehicleId
@@ -274,7 +279,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       pickupTime: '07:30 AM',
       dropTime: '03:30 PM',
       fare: 1500,
-      status: 'ACTIVE'
+      statusId: statuses.length > 0 ? statuses[0].id : ''
     });
     setModalError(null);
     setIsRouteModalOpen(true);
@@ -287,10 +292,10 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       routeNumber: r.routeNumber,
       startLocation: r.startLocation || '',
       endLocation: r.endLocation || '',
-      pickupTime: r.pickupTime || '07:30 AM',
-      dropTime: r.dropTime || '03:30 PM',
+      pickupTime: r.pickupTime || '',
+      dropTime: r.dropTime || '',
       fare: r.fare || 0,
-      status: r.status || 'ACTIVE'
+      statusId: r.status?.id || r.statusId || (statuses.length > 0 ? statuses[0].id : '')
     });
     setModalError(null);
     setIsRouteModalOpen(true);
@@ -315,7 +320,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
         pickupTime: routeForm.pickupTime.trim() || undefined,
         dropTime: routeForm.dropTime.trim() || undefined,
         fare: Number(routeForm.fare),
-        status: routeForm.status
+        statusId: routeForm.statusId || undefined
       };
 
       const res = editingRouteId
@@ -442,7 +447,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
 
   // Filtered Items
   const filteredVehicles = vehicles.filter((v) => {
-    if (statusFilter !== 'ALL' && v.status !== statusFilter) return false;
+    const vStatus = v.status?.title || v.status;
+    if (statusFilter !== 'ALL' && vStatus !== statusFilter) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       const matchNo = v.vehicleNumber.toLowerCase().includes(q);
@@ -455,7 +461,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
   });
 
   const filteredRoutes = routes.filter((r) => {
-    if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+    const rStatus = r.status?.title || r.status;
+    if (statusFilter !== 'ALL' && rStatus !== statusFilter) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       const matchName = r.routeName.toLowerCase().includes(q);
@@ -481,12 +488,12 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
 
   // Metrics
   const totalVehicles = vehicles.length;
-  const activeVehiclesCount = vehicles.filter(v => v.status === 'ACTIVE').length;
-  const maintenanceCount = vehicles.filter(v => v.status === 'MAINTENANCE').length;
+  const activeVehiclesCount = vehicles.filter(v => (v.status?.title || v.status) === 'ACTIVE').length;
+  const maintenanceCount = vehicles.filter(v => (v.status?.title || v.status) === 'MAINTENANCE').length;
   const totalSeats = vehicles.reduce((acc, v) => acc + (v.capacity || 0), 0);
 
   const totalRoutes = routes.length;
-  const activeRoutesCount = routes.filter(r => r.status === 'ACTIVE').length;
+  const activeRoutesCount = routes.filter(r => (r.status?.title || r.status) === 'ACTIVE').length;
   const avgFare = totalRoutes > 0 ? Math.round(routes.reduce((acc, r) => acc + (r.fare || 0), 0) / totalRoutes) : 0;
 
   const totalDrivers = drivers.length;
@@ -734,13 +741,13 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                            v.status === 'ACTIVE'
+                            v.status?.title === 'ACTIVE' || v.status === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : v.status === 'MAINTENANCE'
+                              : v.status?.title === 'MAINTENANCE' || v.status === 'MAINTENANCE'
                               ? 'bg-rose-50 text-rose-700 border border-rose-200'
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}>
-                            {v.status}
+                            {v.status?.title || v.status || 'N/A'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -908,11 +915,11 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                            r.status === 'ACTIVE'
+                            r.status?.title === 'ACTIVE' || r.status === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}>
-                            {r.status}
+                            {r.status?.title || r.status || 'N/A'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -1229,11 +1236,15 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-800 bg-white"
                   >
                     <option value="">Select Driver (Optional)</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} {d.phone ? `(${d.phone})` : ''}
-                      </option>
-                    ))}
+                    {drivers.map((d) => {
+                      const driverName = d.user?.name || d.name || 'Driver';
+                      const driverPhone = d.user?.phone || d.phone;
+                      return (
+                        <option key={d.id} value={d.id}>
+                          {driverName} {driverPhone ? `(${driverPhone})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -1242,14 +1253,19 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                     Status *
                   </label>
                   <select
-                    value={vehicleForm.status}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, status: e.target.value })}
+                    value={vehicleForm.statusId}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, statusId: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-800 bg-white"
+                    required
                   >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="MAINTENANCE">MAINTENANCE</option>
-                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="">Select Status</option>
+                    {statuses.map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
                   </select>
+                  {statuses.length === 0 && (
+                    <p className="text-xs text-rose-500 mt-1">Please add STATUS in Master Data.</p>
+                  )}
                 </div>
               </div>
 
@@ -1401,13 +1417,19 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                     Status *
                   </label>
                   <select
-                    value={routeForm.status}
-                    onChange={(e) => setRouteForm({ ...routeForm, status: e.target.value })}
+                    value={routeForm.statusId}
+                    onChange={(e) => setRouteForm({ ...routeForm, statusId: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-slate-800 bg-white"
+                    required
                   >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="">Select Status</option>
+                    {statuses.map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
                   </select>
+                  {statuses.length === 0 && (
+                    <p className="text-xs text-rose-500 mt-1">Please add STATUS in Master Data.</p>
+                  )}
                 </div>
               </div>
 
