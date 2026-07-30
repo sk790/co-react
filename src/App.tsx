@@ -30,8 +30,13 @@ import { Timetables } from './pages/admin/Timetables';
 import { Transport } from './pages/admin/Transport';
 import { VehicleDetail } from './pages/admin/VehicleDetail';
 import { DriverDetail } from './pages/admin/DriverDetail';
+import { Attendance } from './pages/admin/Attendance';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
+import { TeacherClasses } from './pages/teacher/TeacherClasses';
+import { TeacherTimetable } from './pages/teacher/TeacherTimetable';
+import { TeacherStudents } from './pages/teacher/TeacherStudents';
+import { TeacherAssignments } from './pages/teacher/TeacherAssignments';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ParentDashboard } from './pages/parent/ParentDashboard';
 
@@ -78,6 +83,10 @@ function App() {
             <Route path="/admin/transport/routes" element={<Transport defaultTab="routes" />} />
             <Route path="/admin/transport/drivers" element={<Transport defaultTab="drivers" />} />
             <Route path="/admin/transport/drivers/:id" element={<DriverDetail />} />
+            <Route path="/admin/attendance" element={<Attendance defaultTab="students" />} />
+            <Route path="/admin/attendance/students" element={<Attendance defaultTab="students" />} />
+            <Route path="/admin/attendance/teachers" element={<Attendance defaultTab="teachers" />} />
+            <Route path="/admin/attendance/staff" element={<Attendance defaultTab="staff" />} />
             <Route path="/admin/sessions" element={<AcademicSessions />} />
             <Route path="/admin/roles-permissions" element={<RolesPermissions />} />
             <Route path="/admin/settings" element={<Settings />} />
@@ -89,6 +98,11 @@ function App() {
         <Route element={<RoleGuard allowedRoles={['TEACHER']} />}>
           <Route element={<TeacherLayout />}>
             <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+            <Route path="/teacher/classes" element={<TeacherClasses />} />
+            <Route path="/teacher/attendance" element={<Attendance defaultTab="students" />} />
+            <Route path="/teacher/timetable" element={<TeacherTimetable />} />
+            <Route path="/teacher/students" element={<TeacherStudents />} />
+            <Route path="/teacher/assignments" element={<TeacherAssignments />} />
             <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
           </Route>
         </Route>

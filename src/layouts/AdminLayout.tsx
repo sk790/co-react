@@ -30,7 +30,9 @@ import {
   Clock,
   Bus,
   MapPin,
-  Plus
+  Plus,
+  ClipboardCheck,
+  UserCheck
 } from 'lucide-react';
 
 export const AdminLayout = () => {
@@ -47,6 +49,9 @@ export const AdminLayout = () => {
   const [transportDropdownOpen, setTransportDropdownOpen] = useState(
     location.pathname.startsWith('/admin/transport')
   );
+  const [attendanceDropdownOpen, setAttendanceDropdownOpen] = useState(
+    location.pathname.startsWith('/admin/attendance')
+  );
 
   useEffect(() => {
     fetchSessions();
@@ -58,6 +63,9 @@ export const AdminLayout = () => {
     }
     if (location.pathname.startsWith('/admin/transport')) {
       setTransportDropdownOpen(true);
+    }
+    if (location.pathname.startsWith('/admin/attendance')) {
+      setAttendanceDropdownOpen(true);
     }
   }, [location.pathname]);
 
@@ -276,6 +284,85 @@ export const AdminLayout = () => {
                 >
                   <UserCircle size={15} className="text-indigo-300" />
                   <span>Drivers & Staff</span>
+                </NavLink>
+              </div>
+            </div>
+          </div>
+
+          {/* Attendance Collapsible Dropdown */}
+          <div className="py-0.5">
+            <button
+              onClick={() => setAttendanceDropdownOpen(!attendanceDropdownOpen)}
+              className={`
+                w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group text-sm
+                ${location.pathname.startsWith('/admin/attendance')
+                  ? 'bg-indigo-800/80 text-white font-medium'
+                  : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <ClipboardCheck size={20} className="text-emerald-400 group-hover:text-emerald-300" />
+                <span>Attendance</span>
+              </div>
+              <ChevronDown 
+                size={16} 
+                className={`text-indigo-300 transition-transform duration-300 ease-in-out ${attendanceDropdownOpen ? 'rotate-180' : ''}`} 
+              />
+            </button>
+
+            {/* Smooth Collapsible Submenu */}
+            <div className={`
+              grid transition-all duration-300 ease-in-out overflow-hidden
+              ${attendanceDropdownOpen 
+                ? 'grid-rows-[1fr] opacity-100 mt-1' 
+                : 'grid-rows-[0fr] opacity-0 mt-0'
+              }
+            `}>
+              <div className="min-h-0 ml-4 pl-3 border-l-2 border-indigo-700/60 space-y-1">
+                <NavLink
+                  to="/admin/attendance/students"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <GraduationCap size={15} className="text-indigo-300" />
+                  <span>Students</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/attendance/teachers"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <Users size={15} className="text-purple-300" />
+                  <span>Teachers</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/attendance/staff"
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
+                    flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150
+                    ${isActive 
+                      ? 'bg-indigo-700 text-white font-bold shadow-xs' 
+                      : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+                    }
+                  `}
+                >
+                  <UserCheck size={15} className="text-amber-300" />
+                  <span>Staff</span>
                 </NavLink>
               </div>
             </div>
