@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Bus, 
-  Plus, 
-  Search, 
-  Filter, 
-  Trash2, 
-  Edit3, 
-  Phone, 
-  Users, 
-  RefreshCw, 
-  AlertCircle, 
-  CheckCircle2, 
+import { Link } from 'react-router-dom';
+import {
+  Bus,
+  Plus,
+  Search,
+  Filter,
+  Trash2,
+  Edit3,
+  Eye,
+  Phone,
+  Users,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
   X,
   ShieldAlert,
   MapPin,
@@ -24,14 +26,19 @@ import { apiClient } from '../../api/axios';
 
 interface DriverItem {
   id: string;
-  name: string;
+  name?: string;
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  };
   phone?: string;
   email?: string;
   licenseNumber?: string;
   licenseExpiry?: string;
   experienceYears?: number;
   address?: string;
-  status: string;
   vehicles?: { id: string; vehicleNumber: string }[];
   createdAt: string;
 }
@@ -45,13 +52,18 @@ interface Vehicle {
   driverId?: string;
   driver?: {
     id: string;
-    name: string;
-    phone?: string;
+    user?: {
+      id: string;
+      name: string;
+      email?: string;
+      phone?: string;
+    };
   };
   driverName?: string;
   driverPhone?: string;
   driverLicense?: string;
-  status: string;
+  status: any;
+  statusId?: string;
   createdAt: string;
 }
 
@@ -137,8 +149,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
     email: '',
     licenseNumber: '',
     experienceYears: 5,
-    address: '',
-    status: 'ACTIVE'
+    address: ''
   });
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
@@ -367,8 +378,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       email: '',
       licenseNumber: '',
       experienceYears: 5,
-      address: '',
-      status: 'ACTIVE'
+      address: ''
     });
     setModalError(null);
     setIsDriverModalOpen(true);
@@ -377,13 +387,12 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
   const handleOpenEditDriverModal = (d: DriverItem) => {
     setEditingDriverId(d.id);
     setDriverForm({
-      name: d.name,
-      phone: d.phone || '',
-      email: d.email || '',
+      name: d.user?.name || d.name || '',
+      phone: d.user?.phone || d.phone || '',
+      email: d.user?.email || d.email || '',
       licenseNumber: d.licenseNumber || '',
       experienceYears: d.experienceYears || 5,
-      address: d.address || '',
-      status: d.status || 'ACTIVE'
+      address: d.address || ''
     });
     setModalError(null);
     setIsDriverModalOpen(true);
@@ -406,8 +415,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
         email: driverForm.email.trim() || undefined,
         licenseNumber: driverForm.licenseNumber.trim() || undefined,
         experienceYears: Number(driverForm.experienceYears),
-        address: driverForm.address.trim() || undefined,
-        status: driverForm.status
+        address: driverForm.address.trim() || undefined
       };
 
       const res = editingDriverId
@@ -454,7 +462,10 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       const matchNo = v.vehicleNumber.toLowerCase().includes(q);
       const matchModel = v.vehicleModel?.toLowerCase().includes(q);
       const matchReg = v.registrationNo?.toLowerCase().includes(q);
-      const matchDriver = v.driver?.name?.toLowerCase().includes(q) || v.driverName?.toLowerCase().includes(q);
+      const matchDriver =
+        v.driver?.user?.name?.toLowerCase().includes(q) ||
+        v.driver?.name?.toLowerCase().includes(q) ||
+        v.driverName?.toLowerCase().includes(q);
       return matchNo || matchModel || matchReg || matchDriver;
     }
     return true;
@@ -478,8 +489,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
     if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      const matchName = d.name.toLowerCase().includes(q);
-      const matchPhone = d.phone?.toLowerCase().includes(q);
+      const matchName = (d.user?.name || d.name || '').toLowerCase().includes(q);
+      const matchPhone = (d.user?.phone || d.phone || '').toLowerCase().includes(q);
       const matchLicense = d.licenseNumber?.toLowerCase().includes(q);
       return matchName || matchPhone || matchLicense;
     }
@@ -497,18 +508,17 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
   const avgFare = totalRoutes > 0 ? Math.round(routes.reduce((acc, r) => acc + (r.fare || 0), 0) / totalRoutes) : 0;
 
   const totalDrivers = drivers.length;
-  const activeDriversCount = drivers.filter(d => d.status === 'ACTIVE').length;
+  const assignedDriversCount = drivers.filter(d => d.vehicles && d.vehicles.length > 0).length;
   const licensedDriversCount = drivers.filter(d => Boolean(d.licenseNumber)).length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
+        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${toast.type === 'success'
+            ? 'bg-emerald-600 text-white shadow-emerald-600/20'
             : 'bg-rose-600 text-white shadow-rose-600/20'
-        }`}>
+          }`}>
           {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
           <span>{toast.text}</span>
           <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
@@ -520,13 +530,12 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-2xl border ${
-            activeTab === 'vehicles' 
-              ? 'bg-amber-50 text-amber-600 border-amber-100' 
+          <div className={`p-3 rounded-2xl border ${activeTab === 'vehicles'
+              ? 'bg-amber-50 text-amber-600 border-amber-100'
               : activeTab === 'routes'
-              ? 'bg-purple-50 text-purple-600 border-purple-100'
-              : 'bg-indigo-50 text-indigo-600 border-indigo-100'
-          }`}>
+                ? 'bg-purple-50 text-purple-600 border-purple-100'
+                : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+            }`}>
             {activeTab === 'vehicles' && <Bus size={26} />}
             {activeTab === 'routes' && <MapPin size={26} />}
             {activeTab === 'drivers' && <Users size={26} />}
@@ -710,11 +719,21 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                             <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-200">
                               <Bus size={16} />
                             </div>
-                            <span className="text-sm font-extrabold text-slate-900">{v.vehicleNumber}</span>
+                            <Link
+                              to={`/admin/transport/vehicles/${v.id}`}
+                              className="text-sm font-extrabold text-slate-900 hover:text-amber-600 hover:underline transition-colors"
+                            >
+                              {v.vehicleNumber}
+                            </Link>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
-                          <div className="font-bold text-slate-900">{v.vehicleModel || 'Standard Bus'}</div>
+                          <Link
+                            to={`/admin/transport/vehicles/${v.id}`}
+                            className="font-bold text-slate-900 hover:text-amber-600 hover:underline transition-colors block"
+                          >
+                            {v.vehicleModel || 'Standard Bus'}
+                          </Link>
                           <div className="text-[11px] text-slate-400 font-mono">{v.registrationNo || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 font-bold text-indigo-600 whitespace-nowrap">
@@ -723,15 +742,18 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                           </span>
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
-                          {(v.driver?.name || v.driverName) ? (
+                          {(v.driver?.user?.name || v.driver?.name || v.driverName) ? (
                             <div>
-                              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <Link
+                                to={`/admin/transport/drivers/${v.driver?.id || v.driverId}`}
+                                className="font-bold text-slate-900 hover:text-indigo-600 hover:underline transition-colors flex items-center gap-1.5"
+                              >
                                 <UserCheck size={14} className="text-emerald-600" />
-                                <span>{v.driver?.name || v.driverName}</span>
-                              </div>
-                              {(v.driver?.phone || v.driverPhone) && (
+                                <span>{v.driver?.user?.name || v.driver?.name || v.driverName}</span>
+                              </Link>
+                              {(v.driver?.user?.phone || v.driver?.phone || v.driverPhone) && (
                                 <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                                  <Phone size={11} /> {v.driver?.phone || v.driverPhone}
+                                  <Phone size={11} /> {v.driver?.user?.phone || v.driver?.phone || v.driverPhone}
                                 </div>
                               )}
                             </div>
@@ -740,17 +762,23 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                            v.status?.title === 'ACTIVE' || v.status === 'ACTIVE'
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${v.status?.title === 'ACTIVE' || v.status === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : v.status?.title === 'MAINTENANCE' || v.status === 'MAINTENANCE'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}>
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}>
                             {v.status?.title || v.status || 'N/A'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
+                          <Link
+                            to={`/admin/transport/vehicles/${v.id}`}
+                            className="p-1.5 inline-flex items-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1"
+                            title="View Vehicle Details"
+                          >
+                            <Eye size={16} />
+                          </Link>
                           <button
                             onClick={() => handleOpenEditVehicleModal(v)}
                             className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors mr-1"
@@ -914,11 +942,10 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                           ₹{r.fare || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                            r.status?.title === 'ACTIVE' || r.status === 'ACTIVE'
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${r.status?.title === 'ACTIVE' || r.status === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}>
+                            }`}>
                             {r.status?.title || r.status || 'N/A'}
                           </span>
                         </td>
@@ -967,8 +994,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                 <CheckCircle2 size={22} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500">Active Drivers</p>
-                <h4 className="text-xl font-extrabold text-emerald-600">{activeDriversCount} Staff</h4>
+                <p className="text-xs font-semibold text-slate-500">Assigned Drivers</p>
+                <h4 className="text-xl font-extrabold text-emerald-600">{assignedDriversCount} Staff</h4>
               </div>
             </div>
 
@@ -995,31 +1022,33 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
               />
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-2 text-xs">
-                <Filter size={14} className="text-slate-400" />
-                <span className="font-semibold text-slate-500">Status:</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="ALL">All Status</option>
-                  <option value="ACTIVE">Active Only</option>
-                  <option value="ON_LEAVE">On Leave</option>
-                  <option value="INACTIVE">Inactive Only</option>
-                </select>
-              </div>
+            {activeTab !== 'drivers' && (
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 text-xs">
+                  <Filter size={14} className="text-slate-400" />
+                  <span className="font-semibold text-slate-500">Status:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-xl bg-slate-50 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="ACTIVE">Active Only</option>
+                    <option value="ON_LEAVE">On Leave</option>
+                    <option value="INACTIVE">Inactive Only</option>
+                  </select>
+                </div>
 
-              {(searchTerm || statusFilter !== 'ALL') && (
-                <button
-                  onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); }}
-                  className="text-xs font-bold text-rose-600 hover:underline ml-auto"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
+                {(searchTerm || statusFilter !== 'ALL') && (
+                  <button
+                    onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); }}
+                    className="text-xs font-bold text-rose-600 hover:underline ml-auto"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -1054,7 +1083,6 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                       <th className="px-6 py-4">License Number</th>
                       <th className="px-6 py-4">Experience</th>
                       <th className="px-6 py-4">Assigned Vehicles</th>
-                      <th className="px-6 py-4">Status</th>
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1066,7 +1094,12 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                             <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-200">
                               <UserCheck size={16} />
                             </div>
-                            <span className="text-sm font-extrabold text-slate-900">{d.user?.name || d.name || 'Driver'}</span>
+                            <Link
+                              to={`/admin/transport/drivers/${d.id}`}
+                              className="text-sm font-extrabold text-slate-900 hover:text-indigo-600 hover:underline transition-colors"
+                            >
+                              {d.user?.name || d.name || 'Driver'}
+                            </Link>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
@@ -1098,27 +1131,27 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                           {d.vehicles && d.vehicles.length > 0 ? (
                             <div className="flex items-center gap-1 flex-wrap">
                               {d.vehicles.map(v => (
-                                <span key={v.id} className="px-2 py-0.5 bg-amber-50 border border-amber-200 rounded text-[11px]">
+                                <Link
+                                  key={v.id}
+                                  to={`/admin/transport/vehicles/${v.id}`}
+                                  className="px-2 py-0.5 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 rounded text-[11px] font-bold transition-colors"
+                                >
                                   {v.vehicleNumber}
-                                </span>
+                                </Link>
                               ))}
                             </div>
                           ) : (
                             <span className="text-slate-400 font-normal">Unassigned</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${
-                            d.status === 'ACTIVE'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : d.status === 'ON_LEAVE'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}>
-                            {d.status}
-                          </span>
-                        </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
+                          <Link
+                            to={`/admin/transport/drivers/${d.id}`}
+                            className="p-1.5 inline-flex items-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1"
+                            title="View Driver Profile"
+                          >
+                            <Eye size={16} />
+                          </Link>
                           <button
                             onClick={() => handleOpenEditDriverModal(d)}
                             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors mr-1"
@@ -1127,7 +1160,7 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                             <Edit3 size={16} />
                           </button>
                           <button
-                            onClick={() => handleDeleteDriver(d.id, d.name)}
+                            onClick={() => handleDeleteDriver(d.id, d.user?.name || d.name || 'Driver')}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Delete Driver"
                           >
@@ -1153,8 +1186,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                 <Bus className="text-amber-600" size={22} />
                 <h3>{editingVehicleId ? 'Edit Vehicle Details' : 'Add New Fleet Vehicle'}</h3>
               </div>
-              <button 
-                onClick={() => setIsVehicleModalOpen(false)} 
+              <button
+                onClick={() => setIsVehicleModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
@@ -1299,8 +1332,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                 <MapPin className="text-purple-600" size={22} />
                 <h3>{editingRouteId ? 'Edit Transport Route' : 'Add New Transport Route'}</h3>
               </div>
-              <button 
-                onClick={() => setIsRouteModalOpen(false)} 
+              <button
+                onClick={() => setIsRouteModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
@@ -1463,8 +1496,8 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                 <Users className="text-indigo-600" size={22} />
                 <h3>{editingDriverId ? 'Edit Driver Details' : 'Add New Driver Profile'}</h3>
               </div>
-              <button 
-                onClick={() => setIsDriverModalOpen(false)} 
+              <button
+                onClick={() => setIsDriverModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
@@ -1558,21 +1591,6 @@ export const Transport: React.FC<TransportProps> = ({ defaultTab = 'vehicles' })
                   onChange={(e) => setDriverForm({ ...driverForm, address: e.target.value })}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Status *
-                </label>
-                <select
-                  value={driverForm.status}
-                  onChange={(e) => setDriverForm({ ...driverForm, status: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 bg-white"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="ON_LEAVE">ON LEAVE</option>
-                  <option value="INACTIVE">INACTIVE</option>
-                </select>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
