@@ -524,15 +524,17 @@ export const Sections: React.FC = () => {
                             <Edit3 size={15} />
                           </button>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <button
-                                disabled={deletingId === sec.id}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="Delete Section"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </AlertDialogTrigger>
+                            <AlertDialogTrigger
+                              render={
+                                <button
+                                  disabled={deletingId === sec.id}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Delete Section"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              }
+                            />
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Section?</AlertDialogTitle>
@@ -614,14 +616,16 @@ export const Sections: React.FC = () => {
                         <Edit3 size={15} />
                       </button>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <button
-                            disabled={deletingId === sec.id}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </AlertDialogTrigger>
+                        <AlertDialogTrigger
+                          render={
+                            <button
+                              disabled={deletingId === sec.id}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          }
+                        />
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Section?</AlertDialogTitle>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { GraduationCap, Search, RefreshCw, Mail, Phone, BookOpen, Layers } from 'lucide-react';
 import { apiClient } from '../../api/axios';
 
@@ -107,7 +108,9 @@ export const TeacherStudents: React.FC = () => {
                           <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                             {sName.charAt(0).toUpperCase()}
                           </div>
-                          <span>{sName}</span>
+                          <Link to={`/teacher/students/${s.id}`} className="hover:text-purple-600 transition-colors">
+                            {sName}
+                          </Link>
                         </div>
                       </td>
                       <td className="px-6 py-4 font-mono font-bold text-purple-700 whitespace-nowrap">

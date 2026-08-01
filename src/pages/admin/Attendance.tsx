@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   ClipboardCheck,
@@ -12,63 +13,54 @@ import {
   XCircle,
   Clock,
   AlertCircle,
-  X,
   RefreshCw,
   Save,
-  Check,
-  ChevronRight,
   BookOpen,
-  Briefcase,
   Layers,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '../../api/axios';
+import { toast } from '../../store/toastStore';
+import { LoadingState } from '@/components/LoadingState';
+import { EmptyState } from '@/components/EmptyState';
 
-interface StudentItem {
-  id: string;
-  enrollmentNo?: string;
-  user?: {
+interface EnrollmentInfo {
+  id?: string;
+  sectionId?: string;
+  section?: {
     id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-  };
-  enrollments?: Array<{
-    id: string;
-    section?: {
+    title: string;
+    class?: {
       id: string;
       title: string;
-      class?: {
-        id: string;
-        title: string;
-      };
     };
+  };
+}
+
+interface UserRosterItem {
+  id: string;
+  userId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  enrollmentNo?: string;
+  enrollments?: EnrollmentInfo[];
+  teacherProfile?: {
+    id?: string;
+    specialization?: string;
+    profileAvatar?: string;
+    designation?: { title?: string };
+    department?: { title?: string };
+  };
+  driverInfo?: Array<{
+    id?: string;
+    licenseNumber?: string;
   }>;
-}
-
-interface TeacherItem {
-  id: string;
-  employeeId?: string;
-  department?: { id?: string; title?: string } | string;
-  user?: {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-  };
-}
-
-interface StaffItem {
-  id: string;
-  licenseNumber?: string;
-  experienceYears?: number;
-  user?: {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    role?: string;
-  };
+  attendanceId?: string | null;
+  status?: AttendanceStatus | null;
+  isMarked?: boolean;
+  sectionId?: string | null;
 }
 
 interface ClassOption {
@@ -87,10 +79,13 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isTeacherPortal = location.pathname.startsWith('/teacher');
   const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'staff'>(defaultTab);
 
   useEffect(() => {
-    if (location.pathname.startsWith('/admin/attendance/teachers')) {
+    if (isTeacherPortal) {
+      setActiveTab('students');
+    } else if (location.pathname.startsWith('/admin/attendance/teachers')) {
       setActiveTab('teachers');
     } else if (location.pathname.startsWith('/admin/attendance/staff')) {
       setActiveTab('staff');
@@ -99,7 +94,7 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
     } else if (defaultTab) {
       setActiveTab(defaultTab);
     }
-  }, [location.pathname, defaultTab]);
+  }, [location.pathname, defaultTab, isTeacherPortal]);
 
   // Date selection (YYYY-MM-DD)
   const todayStr = new Date().toISOString().split('T')[0];
@@ -109,222 +104,237 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('ALL');
 
-  // Master Data & Entity Lists
+  // Master Data & Roster Lists
   const [classesList, setClassesList] = useState<ClassOption[]>([]);
-  const [students, setStudents] = useState<StudentItem[]>([]);
-  const [teachers, setTeachers] = useState<TeacherItem[]>([]);
-  const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [roster, setRoster] = useState<UserRosterItem[]>([]);
 
-  // Attendance Records Map: [entityId]: AttendanceStatus
+  // Attendance Records Map: [userId]: AttendanceStatus
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceStatus>>({});
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Notification Toast
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // Compute available sections dynamically based on selectedClassId
+  const availableSections = useMemo(() => {
+    if (!selectedClassId || selectedClassId === 'ALL') {
+      return [];
+    }
+    const targetClass = classesList.find((c) => c.id === selectedClassId);
+    return targetClass?.sections || [];
+  }, [classesList, selectedClassId]);
 
-  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
-    setToast({ type, text });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  // Fetch Entities Data
+  // Fetch Attendance Roster Data from Backend
   const fetchData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     else setRefreshing(true);
 
     try {
-      const [studentsRes, teachersRes, staffRes, classesRes] = await Promise.allSettled([
-        apiClient.get('/students'),
-        apiClient.get('/teachers'),
-        apiClient.get('/drivers'),
-        apiClient.get('/classes')
-      ]);
+      // 1. Fetch Class List if empty
+      if (classesList.length === 0) {
+        const classesRes = await apiClient.get('/classes');
+        const rawClasses = Array.isArray(classesRes.data?.data)
+          ? classesRes.data.data
+          : Array.isArray(classesRes.data)
+            ? classesRes.data
+            : [];
+        setClassesList(rawClasses);
+      }
 
-      let initialRecords: Record<string, AttendanceStatus> = { ...attendanceRecords };
+      // 2. Map activeTab to Role parameter
+      let roleParam = 'STUDENT';
+      if (activeTab === 'teachers') roleParam = 'TEACHER';
+      else if (activeTab === 'staff') roleParam = 'STAFF';
 
-      if (studentsRes.status === 'fulfilled') {
-        const raw = studentsRes.value.data;
-        const fetchedStudents = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
-        setStudents(fetchedStudents);
-        fetchedStudents.forEach((s: StudentItem) => {
-          if (!initialRecords[s.id]) initialRecords[s.id] = 'PRESENT';
+      if (activeTab === 'students' && selectedSectionId === 'ALL') {
+        setRoster([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      const params: any = {
+        date: selectedDate,
+        role: roleParam,
+      };
+
+      if (activeTab === 'students' && selectedSectionId !== 'ALL') {
+        params.sectionId = selectedSectionId;
+      }
+
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+
+      if (statusFilter !== 'ALL') {
+        params.status = statusFilter;
+      }
+
+      const res = await apiClient.get('/attendance', { params });
+
+      if (res.data?.success && res.data?.data) {
+        const { users = [] } = res.data.data;
+
+        // Standardize IDs and Roster Items
+        const formattedUsers: UserRosterItem[] = users.map((u: any) => ({
+          ...u,
+          id: u.userId || u.id,
+          userId: u.userId || u.id,
+        }));
+
+        setRoster(formattedUsers);
+
+        // Pre-fill local attendanceRecords map ONLY for users who have attendance marked in database
+        const recMap: Record<string, AttendanceStatus> = {};
+        formattedUsers.forEach((u) => {
+          if (u.status) {
+            recMap[u.userId] = u.status;
+          }
         });
+        setAttendanceRecords(recMap);
       }
-
-      if (teachersRes.status === 'fulfilled') {
-        const raw = teachersRes.value.data;
-        const fetchedTeachers = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
-        setTeachers(fetchedTeachers);
-        fetchedTeachers.forEach((t: TeacherItem) => {
-          if (!initialRecords[t.id]) initialRecords[t.id] = 'PRESENT';
-        });
-      }
-
-      if (staffRes.status === 'fulfilled') {
-        const raw = staffRes.value.data;
-        const fetchedStaff = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
-        setStaff(fetchedStaff);
-        fetchedStaff.forEach((st: StaffItem) => {
-          if (!initialRecords[st.id]) initialRecords[st.id] = 'PRESENT';
-        });
-      }
-
-      if (classesRes.status === 'fulfilled') {
-        const raw = classesRes.value.data;
-        const fetchedClasses = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);
-        setClassesList(fetchedClasses);
-      }
-
-      setAttendanceRecords(initialRecords);
     } catch (err: any) {
       console.error('Error fetching attendance data:', err);
-      showToast(err.response?.data?.message || 'Error fetching attendance data', 'error');
+      toast.error(
+        err.response?.data?.message || 'Error fetching attendance data',
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  // Re-fetch when date, activeTab, selectedClassId, or selectedSectionId changes
   useEffect(() => {
     fetchData(true);
-  }, []);
+  }, [selectedDate, activeTab, selectedClassId, selectedSectionId]);
 
-  // Update Status for an Entity
-  const handleSetStatus = (id: string, status: AttendanceStatus) => {
-    setAttendanceRecords(prev => ({
+  // Update Status for a single User
+  const handleSetStatus = (userId: string, status: AttendanceStatus) => {
+    setAttendanceRecords((prev) => ({
       ...prev,
-      [id]: status
+      [userId]: status,
     }));
   };
 
-  // Mark All Currently Filtered as Status
+  // Mark All Currently Filtered Users as Status
   const handleMarkAllAs = (status: AttendanceStatus) => {
-    let targetIds: string[] = [];
-    if (activeTab === 'students') targetIds = filteredStudents.map(s => s.id);
-    else if (activeTab === 'teachers') targetIds = filteredTeachers.map(t => t.id);
-    else if (activeTab === 'staff') targetIds = filteredStaff.map(s => s.id);
+    const targetIds = filteredRoster.map((u) => u.userId);
 
-    setAttendanceRecords(prev => {
+    setAttendanceRecords((prev) => {
       const updated = { ...prev };
-      targetIds.forEach(id => {
+      targetIds.forEach((id) => {
         updated[id] = status;
       });
       return updated;
-    });
-
-    showToast(`Marked all ${activeTab} as ${status}`);
+    })
   };
 
-  // Save Attendance
+  // Save Attendance to Backend
   const handleSaveAttendance = async () => {
+    if (roster.length === 0) {
+      toast.error('No users available to mark attendance for.');
+      return;
+    }
+
     setSaving(true);
     try {
-      // Simulate saving attendance payload
-      await new Promise(res => setTimeout(res, 800));
-      showToast(`${activeTab.toUpperCase()} attendance for ${selectedDate} saved successfully!`);
+      const records = roster.map((u) => {
+        const st = attendanceRecords[u.userId] || 'PRESENT';
+        const finalStatus = st === 'ON_LEAVE' ? 'HALF_DAY' : st;
+        const secId =
+          selectedSectionId !== 'ALL'
+            ? selectedSectionId
+            : u.sectionId || u.enrollments?.[0]?.section?.id;
+
+        return {
+          userId: u.userId,
+          status: finalStatus,
+          sectionId: secId || undefined,
+        };
+      });
+
+      const payload = {
+        date: selectedDate,
+        records,
+      };
+
+      const res = await apiClient.post('/attendance', payload);
+
+      if (res.data?.success) {
+        toast.success(
+          `${activeTab.toUpperCase()} attendance for ${selectedDate} saved successfully!`,
+        );
+        fetchData(false);
+      }
     } catch (err: any) {
-      showToast('Failed to save attendance', 'error');
+      console.error('Error saving attendance:', err);
+      toast.error(err.response?.data?.message || 'Failed to save attendance');
     } finally {
       setSaving(false);
     }
   };
 
-  // Filter Logic
-  const filteredStudents = students.filter(s => {
-    if (selectedClassId !== 'ALL') {
-      const studentClassId = s.enrollments?.[0]?.section?.class?.id;
-      if (studentClassId !== selectedClassId) return false;
+  // Client-side search and status filter
+  const filteredRoster = roster.filter((u) => {
+    const currentStatus = attendanceRecords[u.userId];
+    if (statusFilter !== 'ALL') {
+      if (statusFilter === 'UNMARKED') {
+        if (currentStatus) return false;
+      } else if (currentStatus !== statusFilter) {
+        return false;
+      }
     }
-
-    const currentStatus = attendanceRecords[s.id] || 'PRESENT';
-    if (statusFilter !== 'ALL' && currentStatus !== statusFilter) return false;
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      const matchName = s.user?.name?.toLowerCase().includes(q);
-      const matchRoll = s.enrollmentNo?.toLowerCase().includes(q);
-      return matchName || matchRoll;
+      const matchName = u.name?.toLowerCase().includes(q);
+      const matchEnroll = u.enrollmentNo?.toLowerCase().includes(q);
+      const matchPhone = u.phone?.toLowerCase().includes(q);
+      const matchEmail = u.email?.toLowerCase().includes(q);
+      return matchName || matchEnroll || matchPhone || matchEmail;
     }
+
     return true;
   });
 
-  const filteredTeachers = teachers.filter(t => {
-    const currentStatus = attendanceRecords[t.id] || 'PRESENT';
-    if (statusFilter !== 'ALL' && currentStatus !== statusFilter) return false;
-
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      const matchName = t.user?.name?.toLowerCase().includes(q);
-      const matchEmp = t.employeeId?.toLowerCase().includes(q);
-      const deptStr = typeof t.department === 'object' ? t.department?.title : t.department;
-      const matchDept = deptStr?.toLowerCase().includes(q);
-      return matchName || matchEmp || matchDept;
-    }
-    return true;
-  });
-
-  const filteredStaff = staff.filter(st => {
-    const currentStatus = attendanceRecords[st.id] || 'PRESENT';
-    if (statusFilter !== 'ALL' && currentStatus !== statusFilter) return false;
-
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      const matchName = st.user?.name?.toLowerCase().includes(q);
-      const matchPhone = st.user?.phone?.toLowerCase().includes(q);
-      return matchName || matchPhone;
-    }
-    return true;
-  });
-
-  // Calculate Metrics based on active tab
+  // Calculate local live metrics for current active tab
   const getTabStats = () => {
-    let items: Array<{ id: string }> = [];
-    if (activeTab === 'students') items = students;
-    else if (activeTab === 'teachers') items = teachers;
-    else items = staff;
-
-    const total = items.length;
+    const total = roster.length;
     let present = 0;
     let absent = 0;
     let late = 0;
     let leave = 0;
+    let unmarked = 0;
 
-    items.forEach(item => {
-      const st = attendanceRecords[item.id] || 'PRESENT';
+    roster.forEach((item) => {
+      const st = attendanceRecords[item.userId];
       if (st === 'PRESENT') present++;
       else if (st === 'ABSENT') absent++;
       else if (st === 'LATE') late++;
       else if (st === 'HALF_DAY' || st === 'ON_LEAVE') leave++;
+      else unmarked++;
     });
 
-    const percent = total > 0 ? Math.round((present / total) * 100) : 0;
-    return { total, present, absent, late, leave, percent };
+    const markedTotal = present + absent + late + leave;
+    const percent =
+      markedTotal > 0
+        ? Math.round(
+          ((present + late * 0.5 + leave * 0.5) / markedTotal) * 100,
+        )
+        : 0;
+
+    return { total, present, absent, late, leave, unmarked, percent };
   };
 
   const stats = getTabStats();
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-[999999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
-          toast.type === 'success'
-            ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-            : 'bg-rose-600 text-white shadow-rose-600/20'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.text}</span>
-          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
-            <X size={16} />
-          </button>
-        </div>
-      )}
 
-      {/* Main Header & Subtabs */}
+      {/* Main Header & Actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
@@ -344,7 +354,7 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button
             onClick={() => fetchData(false)}
-            className="p-2.5 text-slate-500 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+            className="p-2.5 text-slate-500 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
             title="Refresh List"
           >
             <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
@@ -352,61 +362,60 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
 
           <button
             onClick={handleSaveAttendance}
-            disabled={saving}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50 w-full sm:w-auto"
+            disabled={saving || loading}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50 w-full sm:w-auto cursor-pointer"
           >
             <Save size={16} /> {saving ? 'Saving Records...' : 'Save Attendance'}
           </button>
         </div>
       </div>
 
-      {/* Subtab Navigation Pills (Students / Teachers / Staff) */}
-      <div className="flex items-center p-1.5 bg-slate-200/70 backdrop-blur-xs rounded-2xl border border-slate-200/80 max-w-md">
-        <button
-          onClick={() => {
-            setActiveTab('students');
-            navigate('/admin/attendance/students');
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${
-            activeTab === 'students'
+      {/* Subtab Navigation Pills (Students / Teachers / Staff) - Only shown in Admin Portal */}
+      {!isTeacherPortal && (
+        <div className="flex items-center p-1.5 bg-slate-200/70 backdrop-blur-xs rounded-2xl border border-slate-200/80 max-w-md">
+          <button
+            onClick={() => {
+              setActiveTab('students');
+              navigate('/admin/attendance/students');
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'students'
               ? 'bg-white text-indigo-700 shadow-sm shadow-indigo-900/10'
               : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <GraduationCap size={16} />
-          <span>Students</span>
-        </button>
+              }`}
+          >
+            <GraduationCap size={16} />
+            <span>Students</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('teachers');
-            navigate('/admin/attendance/teachers');
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${
-            activeTab === 'teachers'
+          <button
+            onClick={() => {
+              setActiveTab('teachers');
+              navigate('/admin/attendance/teachers');
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'teachers'
               ? 'bg-white text-indigo-700 shadow-sm shadow-indigo-900/10'
               : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Users size={16} />
-          <span>Teachers</span>
-        </button>
+              }`}
+          >
+            <Users size={16} />
+            <span>Teachers</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('staff');
-            navigate('/admin/attendance/staff');
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${
-            activeTab === 'staff'
+          <button
+            onClick={() => {
+              setActiveTab('staff');
+              navigate('/admin/attendance/staff');
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'staff'
               ? 'bg-white text-indigo-700 shadow-sm shadow-indigo-900/10'
               : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <UserCheck size={16} />
-          <span>Staff</span>
-        </button>
-      </div>
+              }`}
+          >
+            <UserCheck size={16} />
+            <span>Staff</span>
+          </button>
+        </div>
+      )}
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -473,7 +482,7 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent font-bold text-slate-900 focus:outline-none"
+                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
               />
             </div>
 
@@ -484,13 +493,48 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                 <span>Class:</span>
                 <select
                   value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedClassId(e.target.value);
+                    setSelectedSectionId('ALL');
+                  }}
                   className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
                 >
                   <option value="ALL">All Classes</option>
-                  {classesList.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
+                  {classesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
                   ))}
+                </select>
+              </div>
+            )}
+
+            {/* Section Filter (Only visible for Students tab) */}
+            {activeTab === 'students' && (
+              <div
+                className={`flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 transition-opacity ${selectedClassId === 'ALL' ? 'opacity-60' : ''
+                  }`}
+              >
+                <Layers size={15} className="text-indigo-600" />
+                <span>Section:</span>
+                <select
+                  value={selectedSectionId}
+                  onChange={(e) => setSelectedSectionId(e.target.value)}
+                  disabled={selectedClassId === 'ALL'}
+                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {selectedClassId === 'ALL' ? (
+                    <option value="ALL">Select Class First</option>
+                  ) : (
+                    <>
+                      <option value="ALL">All Sections</option>
+                      {availableSections.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.title}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
             )}
@@ -505,26 +549,29 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                 className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Status</option>
-                <option value="PRESENT">Present Only</option>
-                <option value="ABSENT">Absent Only</option>
-                <option value="LATE">Late Only</option>
-                <option value="ON_LEAVE">On Leave / Half-Day</option>
+                <option value="PRESENT">PRESENT</option>
+                <option value="ABSENT">ABSENT</option>
+                <option value="LATE">LATE</option>
+                <option value="HALF_DAY">HALF_DAY</option>
+                <option value="UNMARKED">UNMARKED</option>
               </select>
             </div>
           </div>
 
           {/* Quick Mark All Buttons */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-semibold text-slate-400 mr-1 hidden sm:inline">Bulk Mark:</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1 hidden sm:inline">
+              Bulk Mark:
+            </span>
             <button
               onClick={() => handleMarkAllAs('PRESENT')}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
             >
               <CheckCircle2 size={13} /> Mark All Present
             </button>
             <button
               onClick={() => handleMarkAllAs('ABSENT')}
-              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
             >
               <XCircle size={13} /> Mark All Absent
             </button>
@@ -533,7 +580,10 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
 
         {/* Search Field */}
         <div className="relative w-full">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
           <input
             type="text"
             placeholder={`Search ${activeTab} by name, roll no, phone or details...`}
@@ -545,24 +595,24 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
       </div>
 
       {/* Attendance Tables */}
-      {loading ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 space-y-4 animate-pulse">
-          <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
-          <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
-          <div className="h-12 bg-slate-100 rounded-xl w-full"></div>
-        </div>
+      {loading || refreshing ? (
+        <LoadingState />
       ) : activeTab === 'students' ? (
         /* STUDENTS ATTENDANCE TABLE */
-        filteredStudents.length === 0 ? (
+        selectedSectionId === 'ALL' ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
             <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
-              <GraduationCap size={32} />
+              <Layers size={32} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">No Student Records Found</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              Select Class & Section First
+            </h3>
             <p className="text-slate-500 text-xs max-w-md mx-auto">
-              No students match the current filters or search criteria.
+              Please select a Class and Section from the filters above to view and mark student attendance.
             </p>
           </div>
+        ) : filteredRoster.length === 0 ? (
+          <EmptyState title='No Record found!' />
         ) : (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
@@ -577,21 +627,33 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredStudents.map((s) => {
-                    const st = attendanceRecords[s.id] || 'PRESENT';
-                    const sName = s.user?.name || 'Student';
-                    const sClass = s.enrollments?.[0]?.section?.class?.title || 'N/A';
-                    const sSection = s.enrollments?.[0]?.section?.title || 'N/A';
+                  {filteredRoster.map((s) => {
+                    const st = attendanceRecords[s.userId];
+                    const sName = s.name || 'Student';
+                    const currentSelectedClass = classesList.find((c) => c.id === selectedClassId);
+                    const currentSelectedSection = availableSections.find((sec) => sec.id === selectedSectionId);
+
+                    const sClass =
+                      s.enrollments?.[0]?.section?.class?.title ||
+                      currentSelectedClass?.title ||
+                      'N/A';
+                    const sSection =
+                      s.enrollments?.[0]?.section?.title ||
+                      currentSelectedSection?.title?.split(' - ').pop() ||
+                      'N/A';
 
                     return (
-                      <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={s.userId}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
                         <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                               {sName.charAt(0).toUpperCase()}
                             </div>
                             <Link
-                              to={`/admin/students/${s.id}`}
+                              to={`/admin/students/${s.userId}`}
                               className="hover:text-indigo-600 hover:underline"
                             >
                               {sName}
@@ -607,62 +669,60 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${
-                            st === 'PRESENT'
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${st === 'PRESENT'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : st === 'ABSENT'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : st === 'LATE'
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}>
+                                  : st === 'HALF_DAY' || st === 'ON_LEAVE'
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                          >
                             {st === 'PRESENT' && <CheckCircle2 size={13} />}
                             {st === 'ABSENT' && <XCircle size={13} />}
                             {st === 'LATE' && <Clock size={13} />}
-                            <span>{st}</span>
+                            {(st === 'HALF_DAY' || st === 'ON_LEAVE') && <Clock size={13} />}
+                            {!st && <AlertCircle size={13} className="text-slate-400" />}
+                            <span>
+                              {st
+                                ? st === 'HALF_DAY'
+                                  ? 'HALF DAY'
+                                  : st
+                                : 'Not Marked'}
+                            </span>
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => handleSetStatus(s.id, 'PRESENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'PRESENT'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
-                              }`}
+                              onClick={() => handleSetStatus(s.userId, 'PRESENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'PRESENT'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                }`}
                             >
                               P
                             </button>
                             <button
-                              onClick={() => handleSetStatus(s.id, 'ABSENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ABSENT'
-                                  ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
-                              }`}
+                              onClick={() => handleSetStatus(s.userId, 'ABSENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'ABSENT'
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
+                                }`}
                             >
                               A
                             </button>
                             <button
-                              onClick={() => handleSetStatus(s.id, 'LATE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'LATE'
-                                  ? 'bg-amber-500 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
-                              }`}
+                              onClick={() => handleSetStatus(s.userId, 'LATE')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'LATE'
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                                }`}
                             >
                               L
-                            </button>
-                            <button
-                              onClick={() => handleSetStatus(s.id, 'ON_LEAVE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ON_LEAVE' || st === 'HALF_DAY'
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700'
-                              }`}
-                            >
-                              Leave
                             </button>
                           </div>
                         </td>
@@ -676,14 +736,16 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
         )
       ) : activeTab === 'teachers' ? (
         /* TEACHERS ATTENDANCE TABLE */
-        filteredTeachers.length === 0 ? (
+        filteredRoster.length === 0 ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
             <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-100">
               <Users size={32} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">No Teacher Records Found</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              No Teacher Records Found
+            </h3>
             <p className="text-slate-500 text-xs max-w-md mx-auto">
-              No faculty members match your filter parameter.
+              No faculty members match your filter parameter for date {selectedDate}.
             </p>
           </div>
         ) : (
@@ -700,20 +762,27 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredTeachers.map((t) => {
-                    const st = attendanceRecords[t.id] || 'PRESENT';
-                    const tName = t.user?.name || 'Teacher';
-                    const deptTitle = typeof t.department === 'object' ? t.department?.title : t.department || 'Academics';
+                  {filteredRoster.map((t) => {
+                    const st = attendanceRecords[t.userId];
+                    const tName = t.name || 'Teacher';
+                    const deptTitle =
+                      t.teacherProfile?.department?.title || 'Academics';
+                    const code = t.teacherProfile?.id
+                      ? t.teacherProfile.id.substring(0, 7).toUpperCase()
+                      : 'FAC-101';
 
                     return (
-                      <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={t.userId}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
                         <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
                               {tName.charAt(0).toUpperCase()}
                             </div>
                             <Link
-                              to={`/admin/teachers/${t.id}`}
+                              to={`/admin/teachers/${t.userId}`}
                               className="hover:text-purple-600 hover:underline"
                             >
                               {tName}
@@ -721,69 +790,78 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                           </div>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-indigo-600 whitespace-nowrap">
-                          {t.employeeId || 'FAC-101'}
+                          {code}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
                           <div className="font-semibold">{deptTitle}</div>
-                          <div className="text-[11px] text-slate-400">{t.user?.phone || 'N/A'}</div>
+                          <div className="text-[11px] text-slate-400">
+                            {t.phone || 'N/A'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${
-                            st === 'PRESENT'
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${st === 'PRESENT'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : st === 'ABSENT'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : st === 'LATE'
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}>
+                                  : st === 'HALF_DAY' || st === 'ON_LEAVE'
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                          >
                             {st === 'PRESENT' && <CheckCircle2 size={13} />}
                             {st === 'ABSENT' && <XCircle size={13} />}
                             {st === 'LATE' && <Clock size={13} />}
-                            <span>{st}</span>
+                            {(st === 'HALF_DAY' || st === 'ON_LEAVE') && <Clock size={13} />}
+                            {!st && <AlertCircle size={13} className="text-slate-400" />}
+                            <span>
+                              {st
+                                ? st === 'HALF_DAY'
+                                  ? 'HALF DAY'
+                                  : st
+                                : 'Not Marked'}
+                            </span>
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => handleSetStatus(t.id, 'PRESENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'PRESENT'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
-                              }`}
+                              onClick={() => handleSetStatus(t.userId, 'PRESENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'PRESENT'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                }`}
                             >
                               P
                             </button>
                             <button
-                              onClick={() => handleSetStatus(t.id, 'ABSENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ABSENT'
-                                  ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
-                              }`}
+                              onClick={() => handleSetStatus(t.userId, 'ABSENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'ABSENT'
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
+                                }`}
                             >
                               A
                             </button>
                             <button
-                              onClick={() => handleSetStatus(t.id, 'LATE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'LATE'
-                                  ? 'bg-amber-500 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
-                              }`}
+                              onClick={() => handleSetStatus(t.userId, 'LATE')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'LATE'
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                                }`}
                             >
                               L
                             </button>
                             <button
-                              onClick={() => handleSetStatus(t.id, 'ON_LEAVE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ON_LEAVE'
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700'
-                              }`}
+                              onClick={() => handleSetStatus(t.userId, 'HALF_DAY')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'HALF_DAY' || st === 'ON_LEAVE'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700'
+                                }`}
                             >
-                              Leave
+                              Half-Day
                             </button>
                           </div>
                         </td>
@@ -797,14 +875,16 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
         )
       ) : (
         /* STAFF ATTENDANCE TABLE */
-        filteredStaff.length === 0 ? (
+        filteredRoster.length === 0 ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
             <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-100">
               <UserCheck size={32} />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">No Staff Records Found</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              No Staff Records Found
+            </h3>
             <p className="text-slate-500 text-xs max-w-md mx-auto">
-              No staff members or drivers match your filter criteria.
+              No staff members or drivers match your filter criteria for date {selectedDate}.
             </p>
           </div>
         ) : (
@@ -821,24 +901,24 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredStaff.map((stItem) => {
-                    const st = attendanceRecords[stItem.id] || 'PRESENT';
-                    const stName = stItem.user?.name || 'Staff Member';
-                    const stRole = stItem.user?.role || 'Driver / Transport Staff';
+                  {filteredRoster.map((stItem) => {
+                    const st = attendanceRecords[stItem.userId];
+                    const stName = stItem.name || 'Staff Member';
+                    const stRole = stItem.role || 'Staff / Transport Staff';
 
                     return (
-                      <tr key={stItem.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={stItem.userId}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
                         <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                               {stName.charAt(0).toUpperCase()}
                             </div>
-                            <Link
-                              to={`/admin/transport/drivers/${stItem.id}`}
-                              className="hover:text-amber-600 hover:underline"
-                            >
+                            <span className="font-bold text-slate-900">
                               {stName}
-                            </Link>
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-semibold text-slate-700 whitespace-nowrap">
@@ -847,65 +927,72 @@ export const Attendance: React.FC<AttendanceProps> = ({ defaultTab = 'students' 
                           </span>
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
-                          {stItem.user?.phone || 'N/A'}
+                          {stItem.phone || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${
-                            st === 'PRESENT'
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 w-fit ${st === 'PRESENT'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : st === 'ABSENT'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : st === 'LATE'
                                   ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}>
+                                  : st === 'HALF_DAY' || st === 'ON_LEAVE'
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                          >
                             {st === 'PRESENT' && <CheckCircle2 size={13} />}
                             {st === 'ABSENT' && <XCircle size={13} />}
                             {st === 'LATE' && <Clock size={13} />}
-                            <span>{st}</span>
+                            {(st === 'HALF_DAY' || st === 'ON_LEAVE') && <Clock size={13} />}
+                            {!st && <AlertCircle size={13} className="text-slate-400" />}
+                            <span>
+                              {st
+                                ? st === 'HALF_DAY'
+                                  ? 'HALF DAY'
+                                  : st
+                                : 'Not Marked'}
+                            </span>
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => handleSetStatus(stItem.id, 'PRESENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'PRESENT'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
-                              }`}
+                              onClick={() => handleSetStatus(stItem.userId, 'PRESENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'PRESENT'
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                }`}
                             >
                               P
                             </button>
                             <button
-                              onClick={() => handleSetStatus(stItem.id, 'ABSENT')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ABSENT'
-                                  ? 'bg-rose-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
-                              }`}
+                              onClick={() => handleSetStatus(stItem.userId, 'ABSENT')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'ABSENT'
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
+                                }`}
                             >
                               A
                             </button>
                             <button
-                              onClick={() => handleSetStatus(stItem.id, 'LATE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'LATE'
-                                  ? 'bg-amber-500 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
-                              }`}
+                              onClick={() => handleSetStatus(stItem.userId, 'LATE')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'LATE'
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                                }`}
                             >
                               L
                             </button>
                             <button
-                              onClick={() => handleSetStatus(stItem.id, 'ON_LEAVE')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all ${
-                                st === 'ON_LEAVE'
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700'
-                              }`}
+                              onClick={() => handleSetStatus(stItem.userId, 'HALF_DAY')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${st === 'HALF_DAY' || st === 'ON_LEAVE'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700'
+                                }`}
                             >
-                              Leave
+                              Half-Day
                             </button>
                           </div>
                         </td>

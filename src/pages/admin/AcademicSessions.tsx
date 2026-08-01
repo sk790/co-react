@@ -253,15 +253,17 @@ export const AcademicSessions: React.FC = () => {
                           )}
 
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <button
-                                onClick={() => setDeletingId(session.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Delete Session"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </AlertDialogTrigger>
+                            <AlertDialogTrigger
+                              render={
+                                <button
+                                  onClick={() => setDeletingId(session.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="Delete Session"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              }
+                            />
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Academic Session?</AlertDialogTitle>

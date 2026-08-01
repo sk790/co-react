@@ -62,15 +62,39 @@ export const Login = () => {
       if (response.data.success) {
         const { accessToken, user } = response.data.data;
         
-        // Save token and user to store
+        // Save token first so subsequent API calls use it
         setToken(accessToken);
+
+        let teacherProfileId = user.teacherProfileId
+
+        if (user.role === 'TEACHER' && !teacherProfileId) {
+          try {
+            const teachersRes = await apiClient.get('/teachers');
+            const rawTeachers = teachersRes.data;
+            const teachersList = Array.isArray(rawTeachers?.data) ? rawTeachers.data : (Array.isArray(rawTeachers) ? rawTeachers : []);
+            const teacherProfile = teachersList.find((t: any) =>
+              t.user?.id === user.id || t.userId === user.id || t.user?.email === user.email
+            );
+            if (teacherProfile?.id) {
+              teacherProfileId = teacherProfile.id;
+            }
+          } catch (e) {
+            console.error('Could not fetch teacher profile ID on login:', e);
+          }
+        }
+
+        if (teacherProfileId) {
+          localStorage.setItem('teacherProfileId', teacherProfileId);
+        }
+
         login({
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
           tenantId: tenant || 'default',
-          schoolId: user.schoolId
+          schoolId: user.schoolId,
+          teacherProfileId
         });
         
         // Dynamically import to avoid any circular dependency at boot

@@ -617,15 +617,17 @@ export const Students: React.FC = () => {
                           <Edit3 size={15} />
                         </button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <button
-                              disabled={deletingId === s.id}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Remove Student"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </AlertDialogTrigger>
+                          <AlertDialogTrigger
+                            render={
+                              <button
+                                disabled={deletingId === s.id}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="Remove Student"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            }
+                          />
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove Student?</AlertDialogTitle>
@@ -698,14 +700,16 @@ export const Students: React.FC = () => {
                       <Edit3 size={15} />
                     </button>
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          disabled={deletingId === s.id}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </AlertDialogTrigger>
+                      <AlertDialogTrigger
+                        render={
+                          <button
+                            disabled={deletingId === s.id}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        }
+                      />
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Remove Student?</AlertDialogTitle>

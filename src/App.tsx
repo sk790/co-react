@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { getSubdomain } from './utils/tenant';
 import { useTenantStore } from './store/tenantStore';
 
 import { RoleGuard } from './components/RoleGuard';
+import { ToastContainer } from './components/ToastContainer';
 
 import { AdminLayout } from './layouts/AdminLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
@@ -34,9 +35,14 @@ import { Attendance } from './pages/admin/Attendance';
 
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { TeacherClasses } from './pages/teacher/TeacherClasses';
+import { TeacherClassDetail } from './pages/teacher/TeacherClassDetail';
+import { TeacherSections } from './pages/teacher/TeacherSections';
+import { TeacherSectionDetail } from './pages/teacher/TeacherSectionDetail';
 import { TeacherTimetable } from './pages/teacher/TeacherTimetable';
 import { TeacherStudents } from './pages/teacher/TeacherStudents';
+import { TeacherStudentDetail } from './pages/teacher/TeacherStudentDetail';
 import { TeacherAssignments } from './pages/teacher/TeacherAssignments';
+import { TeacherMarks } from './pages/teacher/TeacherMarks';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ParentDashboard } from './pages/parent/ParentDashboard';
 
@@ -56,6 +62,7 @@ function App() {
 
   return (
     <Router>
+      <ToastContainer />
       <Routes>
         {/* Main Domain Route */}
         <Route path="/" element={tenant ? <Navigate to="/login" replace /> : <LandingPage />} />
@@ -99,9 +106,14 @@ function App() {
           <Route element={<TeacherLayout />}>
             <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
             <Route path="/teacher/classes" element={<TeacherClasses />} />
+            <Route path="/teacher/classes/:id" element={<TeacherClassDetail />} />
+            <Route path="/teacher/sections" element={<TeacherSections />} />
+            <Route path="/teacher/sections/:id" element={<TeacherSectionDetail />} />
             <Route path="/teacher/attendance" element={<Attendance defaultTab="students" />} />
             <Route path="/teacher/timetable" element={<TeacherTimetable />} />
             <Route path="/teacher/students" element={<TeacherStudents />} />
+            <Route path="/teacher/students/:id" element={<TeacherStudentDetail />} />
+            <Route path="/teacher/marks" element={<TeacherMarks />} />
             <Route path="/teacher/assignments" element={<TeacherAssignments />} />
             <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
           </Route>

@@ -10,6 +10,7 @@ interface User {
   role: UserRole;
   schoolId?: string;
   tenantId?: string;
+  teacherProfileId?: string;
 }
 
 interface AuthState {
@@ -27,8 +28,17 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      login: (userData) => set({ user: userData, isAuthenticated: true }),
-      logout: () => set({ user: null, accessToken: null, isAuthenticated: false }),
+      login: (userData) => {
+        const profileId = userData.teacherProfileId
+        if (profileId) {
+          localStorage.setItem('teacherProfileId', profileId);
+        }
+        set({ user: userData, isAuthenticated: true });
+      },
+      logout: () => {
+        localStorage.removeItem('teacherProfileId');
+        set({ user: null, accessToken: null, isAuthenticated: false });
+      },
       setToken: (token) => set({ accessToken: token }),
     }),
     {
