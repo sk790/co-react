@@ -21,8 +21,13 @@ apiClient.interceptors.request.use((config) => {
   }
 
   const activeSessionId = useSessionStore.getState().activeSessionId;
-  if (activeSessionId && !config.headers['x-session-id']) {
-    config.headers['x-session-id'] = activeSessionId;
+  if (activeSessionId) {
+    if (!config.headers['x-session-id']) {
+      config.headers['x-session-id'] = activeSessionId;
+    }
+    if (!config.headers['sessionid']) {
+      config.headers['sessionid'] = activeSessionId;
+    }
   }
 
   return config;
